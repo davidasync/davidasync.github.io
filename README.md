@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Portfolio
 
-## Getting Started
+A terminal-inspired, single-page developer portfolio: hero, about, skills, engineering work,
+experience, and contact. Built with Next.js 16 (App Router), TypeScript, and Tailwind CSS v4.
+No UI dependencies beyond those — every component is local.
 
-First, run the development server:
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm run dev     # http://localhost:3000
+npm run build   # static export in ./out
+python3 -m http.server 8000 -d out
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Make it yours
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+All copy lives in one file: **`src/content/site.ts`**. Edit it and the whole page updates.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| What to change              | Where in `site.ts`         |
+| --------------------------- | -------------------------- |
+| Name, role, contact, location | `profile`                |
+| GitHub / LinkedIn / Medium links | `socials`             |
+| Bio paragraphs, quick facts | `about`                    |
+| Tech pills                  | `skillGroups`              |
+| Engineering highlight cards | `projects`                |
+| Work history                | `experience`               |
+| Nav labels                  | `navLinks`                 |
 
-## Learn More
+The current copy is based on davidasync's public LinkedIn and GitHub profiles. Review the
+dates and descriptions before publishing, and add any results or context that should be
+included.
 
-To learn more about Next.js, take a look at the following resources:
+Replace `src/app/favicon.ico` with the final site icon before publishing.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Styling
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Colours are CSS variables in `src/app/globals.css`, defined once for light mode on `:root`
+and overridden under `.dark`. Change `--accent` to re-theme the whole site. Tailwind reads
+them through the `@theme inline` block, so utilities like `bg-accent` and `text-muted` work
+everywhere. Terminal chrome is shared through `src/components/TerminalWindow.tsx`.
 
-## Deploy on Vercel
+Dark mode is class-based. A small inline script in `src/app/layout.tsx` applies the saved
+preference before first paint, so there is no flash of the wrong theme; the toggle in the
+nav writes to `localStorage`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Scroll-in animations come from `src/components/Reveal.tsx` (an `IntersectionObserver` plus a
+CSS transition). They are gated behind a `.js` class and disabled under
+`prefers-reduced-motion`, so the page still reads fine without JavaScript.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy
+
+The site is exported as static HTML and deployed to GitHub Pages. Every push to `main`
+triggers `.github/workflows/deploy.yml`, which builds the site and publishes the `out`
+directory.
+
+Production: [https://davidasync.github.io](https://davidasync.github.io)

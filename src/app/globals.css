@@ -1,26 +1,207 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #edf3ec;
+  --surface: #f7faf6;
+  --surface-2: #e4ede3;
+  --border: #b9c9ba;
+  --foreground: #132018;
+  --muted: #5b6f61;
+  --accent: #087a36;
+  --accent-soft: #d7eadc;
+  --accent-contrast: #ffffff;
+  --terminal-cyan: #087d89;
+  --terminal-yellow: #9a6500;
+  --terminal-red: #b4233d;
+  --terminal-shadow: rgba(29, 57, 37, 0.16);
+  --scanline: rgba(24, 48, 30, 0.035);
+}
+
+.dark {
+  --background: #050806;
+  --surface: #09100b;
+  --surface-2: #0e1811;
+  --border: #203927;
+  --foreground: #d9f5df;
+  --muted: #79a284;
+  --accent: #5cf287;
+  --accent-soft: #102819;
+  --accent-contrast: #041008;
+  --terminal-cyan: #67e8f9;
+  --terminal-yellow: #facc15;
+  --terminal-red: #fb7185;
+  --terminal-shadow: rgba(0, 0, 0, 0.52);
+  --scanline: rgba(92, 242, 135, 0.025);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-terminal-cyan: var(--terminal-cyan);
+  --color-terminal-yellow: var(--terminal-yellow);
+  --color-terminal-red: var(--terminal-red);
+  --font-sans: var(--font-geist-mono);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: radial-gradient(
+    ellipse 80% 45% at 50% -10%,
+    color-mix(in srgb, var(--accent) 9%, transparent),
+    transparent 72%
+  );
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    var(--scanline) 4px
+  );
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Terminal grid that fades into the page background. */
+.terminal-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--accent) 9%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--accent) 9%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 82% 60% at 50% 15%,
+    #000 20%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 82% 60% at 50% 15%,
+    #000 20%,
+    transparent 100%
+  );
+}
+
+.terminal-window {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 4%, transparent),
+    0 24px 80px var(--terminal-shadow);
+  backdrop-filter: blur(14px);
+}
+
+.terminal-titlebar {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 0.62em;
+  height: 1.05em;
+  margin-left: 0.2em;
+  vertical-align: -0.12em;
+  background: var(--accent);
+  animation: cursor-blink 1.05s steps(1, end) infinite;
+}
+
+.terminal-card {
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+/* Scroll-in animation only applies when JS is available, so the page still
+   reads normally with scripting off. */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.js .reveal[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes cursor-blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .terminal-cursor {
+    animation: none;
+  }
 }
