@@ -11,12 +11,12 @@ export default function Contact() {
     >
       <Reveal>
         <TerminalWindow
-          title={`contact.sh — ${profile.name.toLowerCase()}@portfolio`}
+          title={`contact.sh — ${profile.name.toLowerCase()}@home`}
           contentClassName="p-6 sm:p-10"
         >
           <p className="text-xs sm:text-sm">
             <span className="text-accent">
-              {profile.name.toLowerCase()}@portfolio
+              {profile.name.toLowerCase()}@home
             </span>
             <span className="text-terminal-cyan">:~/contact</span>
             <span>$</span>{" "}

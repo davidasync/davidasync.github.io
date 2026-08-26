@@ -1,11 +1,13 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { navLinks, profile } from "@/content/site";
 import ThemeToggle from "./ThemeToggle";
 import { CloseIcon, MenuIcon } from "./icons";
 
 export default function Nav() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("");
@@ -18,7 +20,12 @@ export default function Nav() {
   }, []);
 
   useEffect(() => {
+    if (pathname !== "/") {
+      return;
+    }
+
     const sections = navLinks
+      .filter(({ href }) => href.startsWith("#"))
       .map(({ href }) => document.querySelector(href))
       .filter((el): el is Element => el !== null);
 
@@ -34,7 +41,18 @@ export default function Nav() {
 
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
-  }, []);
+  }, [pathname]);
+
+  const resolveHref = (href: string) =>
+    href.startsWith("#") && pathname !== "/" ? `/${href}` : href;
+
+  const isActive = (href: string) => {
+    if (href.startsWith("#")) return pathname === "/" && active === href;
+    return pathname.replace(/\/$/, "") === href.replace(/\/$/, "");
+  };
+
+  const commandLabel = (label: string) =>
+    label.toLowerCase().replaceAll(" ", "-");
 
   return (
     <header
@@ -46,11 +64,11 @@ export default function Nav() {
     >
       <nav className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
         <a
-          href="#top"
+          href={pathname === "/" ? "#top" : "/"}
           className="text-xs font-medium tracking-tight sm:text-sm"
           onClick={() => setOpen(false)}
         >
-          <span className="text-accent">{profile.name.toLowerCase()}@portfolio</span>
+          <span className="text-accent">{profile.name.toLowerCase()}@home</span>
           <span className="text-terminal-cyan">:~</span>
           <span className="text-foreground">$</span>
         </a>
@@ -59,14 +77,14 @@ export default function Nav() {
           {navLinks.map((link) => (
             <li key={link.href}>
               <a
-                href={link.href}
+                href={resolveHref(link.href)}
                 className={`rounded-sm border px-2.5 py-1.5 text-xs transition ${
-                  active === link.href
+                  isActive(link.href)
                     ? "border-accent/30 bg-accent-soft text-accent"
                     : "border-transparent text-muted hover:border-border hover:text-foreground"
                 }`}
               >
-                ./{link.label.toLowerCase()}
+                ./{commandLabel(link.label)}
               </a>
             </li>
           ))}
@@ -96,12 +114,14 @@ export default function Nav() {
             {navLinks.map((link) => (
               <li key={link.href}>
                 <a
-                  href={link.href}
+                  href={resolveHref(link.href)}
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 border-b border-dashed border-border/70 py-3 text-sm text-muted last:border-0 hover:text-accent"
+                  className={`flex items-center gap-2 border-b border-dashed border-border/70 py-3 text-sm last:border-0 hover:text-accent ${
+                    isActive(link.href) ? "text-accent" : "text-muted"
+                  }`}
                 >
                   <span className="text-accent">$</span>
-                  cd ./{link.label.toLowerCase()}
+                  cd ./{commandLabel(link.label)}
                 </a>
               </li>
             ))}

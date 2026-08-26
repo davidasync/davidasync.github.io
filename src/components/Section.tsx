@@ -27,9 +27,9 @@ export default function Section({
       <Reveal>
         <p className="flex flex-wrap items-center gap-x-1 text-xs sm:text-sm">
           <span className="text-accent">
-            {profile.name.toLowerCase()}@portfolio
+            {profile.name.toLowerCase()}@home
           </span>
-          <span className="text-terminal-cyan">:~/portfolio</span>
+          <span className="text-terminal-cyan">:~/home</span>
           <span>$</span>
           <span className="text-muted">{eyebrow}</span>
         </p>

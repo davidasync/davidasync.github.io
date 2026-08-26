@@ -6,7 +6,7 @@ export default function Footer() {
       <div className="mx-auto flex w-full max-w-5xl flex-col justify-between gap-3 px-6 py-7 text-[11px] text-muted sm:flex-row sm:items-center">
         <p>
           <span className="text-accent">
-            {profile.name.toLowerCase()}@portfolio
+            {profile.name.toLowerCase()}@home
           </span>
           <span className="text-terminal-cyan">:~</span>
           <span className="text-foreground">$</span> echo &quot;©{" "}

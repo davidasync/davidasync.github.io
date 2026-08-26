@@ -19,12 +19,12 @@ export default function Hero() {
 
       <div className="mx-auto w-full max-w-5xl">
         <TerminalWindow
-          title={`${profile.name.toLowerCase()}@portfolio: ~`}
+          title={`${profile.name.toLowerCase()}@home: ~`}
           contentClassName="p-5 sm:p-8 lg:p-10"
         >
           <p className="text-xs sm:text-sm">
             <span className="text-accent">
-              {profile.name.toLowerCase()}@portfolio
+              {profile.name.toLowerCase()}@home
             </span>
             <span className="text-terminal-cyan">:~</span>
             <span className="text-foreground">$</span>{" "}

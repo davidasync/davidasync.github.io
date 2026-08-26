@@ -291,4 +291,5 @@ export const navLinks = [
   { label: "Work", href: "#work" },
   { label: "Experience", href: "#experience" },
   { label: "Contact", href: "#contact" },
+  { label: "Dev Tools", href: "/dev-tools/" },
 ];
