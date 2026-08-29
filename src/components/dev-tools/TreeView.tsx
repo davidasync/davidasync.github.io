@@ -37,6 +37,7 @@ export default function TreeView({
   const [expansion, setExpansion] = useState<Expansion>("default");
   const [expansionVersion, setExpansionVersion] = useState(0);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [seenRoot, setSeenRoot] = useState(root);
   const menuRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected =
@@ -45,11 +46,12 @@ export default function TreeView({
       : { path: rootPath, node: root };
   const pathType = root.type === "element" ? "XPath" : "JSONPath";
 
-  useEffect(() => {
+  if (root !== seenRoot) {
+    setSeenRoot(root);
     setExpansion("default");
     setExpansionVersion(0);
     setMenu(null);
-  }, [root]);
+  }
 
   useEffect(() => {
     if (!menu) return;
