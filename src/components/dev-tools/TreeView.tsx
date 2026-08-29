@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   formatTreeNodeValue,
   type TreeNode,
@@ -11,7 +11,8 @@ type TreeViewProps = {
   fullscreen?: boolean;
 };
 
-type CopiedAction = "path" | "raw" | "parsed";
+type CopiedAction = "path" | "parsed";
+type Expansion = "default" | "all" | "none";
 
 const copyButtonClass =
   "shrink-0 rounded-sm border border-border px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted transition hover:border-accent/60 hover:text-accent";
@@ -27,11 +28,18 @@ export default function TreeView({
     node: TreeNode;
   } | null>(null);
   const [copied, setCopied] = useState<CopiedAction | null>(null);
+  const [expansion, setExpansion] = useState<Expansion>("default");
+  const [expansionVersion, setExpansionVersion] = useState(0);
   const selected =
     selection?.root === root
       ? selection
       : { path: rootPath, node: root };
   const pathType = root.type === "element" ? "XPath" : "JSONPath";
+
+  useEffect(() => {
+    setExpansion("default");
+    setExpansionVersion(0);
+  }, [root]);
 
   const selectPath = (path: string, node: TreeNode) => {
     setSelection({ root, path, node });
@@ -42,7 +50,7 @@ export default function TreeView({
     const value =
       action === "path"
         ? selected.path
-        : formatTreeNodeValue(selected.node, action);
+        : formatTreeNodeValue(selected.node);
 
     try {
       await navigator.clipboard.writeText(value);
@@ -74,6 +82,17 @@ export default function TreeView({
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <button
             type="button"
+            aria-pressed={expansion === "all"}
+            onClick={() => {
+              setExpansion((current) => (current === "all" ? "none" : "all"));
+              setExpansionVersion((version) => version + 1);
+            }}
+            className={copyButtonClass}
+          >
+            {expansion === "all" ? "collapse all" : "expand all"}
+          </button>
+          <button
+            type="button"
             onClick={() => void copy("path")}
             className={copyButtonClass}
           >
@@ -81,27 +100,22 @@ export default function TreeView({
           </button>
           <button
             type="button"
-            onClick={() => void copy("raw")}
-            className={copyButtonClass}
-          >
-            {copied === "raw" ? "copied" : "copy raw"}
-          </button>
-          <button
-            type="button"
             onClick={() => void copy("parsed")}
             className={copyButtonClass}
           >
-            {copied === "parsed" ? "copied" : "copy parsed"}
+            {copied === "parsed" ? "copied" : "copy value"}
           </button>
         </div>
       </div>
 
       <TreeBranch
+        key={expansionVersion}
         node={root}
         depth={0}
         path={rootPath}
         selectedPath={selected.path}
         onSelect={selectPath}
+        expansion={expansion}
       />
     </div>
   );
@@ -113,15 +127,17 @@ function TreeBranch({
   path,
   selectedPath,
   onSelect,
+  expansion,
 }: {
   node: TreeNode;
   depth: number;
   path: string;
   selectedPath: string;
   onSelect: (path: string, node: TreeNode) => void;
+  expansion: Expansion;
 }) {
   const hasChildren = node.children !== undefined;
-  const [expanded, setExpanded] = useState(depth < 2);
+  const [expanded, setExpanded] = useState(initialExpanded(depth, expansion));
   const selected = selectedPath === path;
 
   if (!hasChildren) {
@@ -193,6 +209,7 @@ function TreeBranch({
                 path={childPath(path, node, child, index)}
                 selectedPath={selectedPath}
                 onSelect={onSelect}
+                expansion={expansion}
               />
             ))
           ) : (
@@ -202,6 +219,12 @@ function TreeBranch({
       ) : null}
     </div>
   );
+}
+
+function initialExpanded(depth: number, expansion: Expansion) {
+  if (expansion === "all") return true;
+  if (expansion === "none") return false;
+  return depth < 2;
 }
 
 function childPath(

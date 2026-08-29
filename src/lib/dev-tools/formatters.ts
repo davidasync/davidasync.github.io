@@ -17,7 +17,6 @@ export type TreeNode = {
   value?: string;
   children?: TreeNode[];
   nestedJson?: boolean;
-  rawValue?: string;
 };
 
 export function formatJson(value: string) {
@@ -158,33 +157,24 @@ function indentXmlElement(
   }
 }
 
-export function formatTreeNodeValue(
-  node: TreeNode,
-  mode: "raw" | "parsed",
-) {
-  const value = treeToCopiedValue(node, mode === "parsed");
+export function formatTreeNodeValue(node: TreeNode) {
+  const value = treeToCopiedValue(node);
 
   if (typeof value === "string") return value;
   return JSON.stringify(value, null, 2);
 }
 
-function treeToCopiedValue(node: TreeNode, expand: boolean): unknown {
-  if (!expand && node.nestedJson && node.rawValue !== undefined) {
-    return node.rawValue;
-  }
-
+function treeToCopiedValue(node: TreeNode): unknown {
   switch (node.type) {
     case "object":
       return Object.fromEntries(
         (node.children ?? []).map((child) => [
           child.label,
-          treeToCopiedValue(child, expand),
+          treeToCopiedValue(child),
         ]),
       );
     case "array":
-      return (node.children ?? []).map((child) =>
-        treeToCopiedValue(child, expand),
-      );
+      return (node.children ?? []).map((child) => treeToCopiedValue(child));
     case "number": {
       const parsed = Number(node.value);
       return node.value !== undefined && Number.isFinite(parsed)
@@ -318,7 +308,6 @@ function valueToTree(
           return {
             ...valueToTree(label, parsed, visited, true),
             nestedJson: true,
-            rawValue: value,
           };
         }
       } catch {

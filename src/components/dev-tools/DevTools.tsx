@@ -226,17 +226,18 @@ export default function DevTools() {
     }
   };
 
-  const copyOutput = async (expandJsonStrings: boolean) => {
+  const copyOutput = async () => {
     if (!current.output) return;
 
     try {
-      const value = expandJsonStrings
-        ? formatJsonWithExpandedStrings(current.output)
-        : current.output;
+      const value =
+        activeTool === "json"
+          ? formatJsonWithExpandedStrings(current.output)
+          : current.output;
 
       await navigator.clipboard.writeText(value);
       setStatus(
-        expandJsonStrings
+        activeTool === "json"
           ? "Parsed JSON copied to clipboard."
           : "Output copied to clipboard.",
       );
@@ -325,6 +326,79 @@ export default function DevTools() {
           <DiffChecker />
         ) : (
           <>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {activeTool === "base64" ? (
+            <>
+              <button
+                type="button"
+                onClick={() => run("encode")}
+                className={`${buttonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
+              >
+                encode
+              </button>
+              <button
+                type="button"
+                onClick={() => run("decode")}
+                className={`${buttonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
+              >
+                decode
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => run("format")}
+              className={`${buttonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
+            >
+              beautify
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void copyOutput()}
+            disabled={!current.output}
+            title={
+              activeTool === "json"
+                ? "Parse nested JSON strings into objects and arrays before copying"
+                : undefined
+            }
+            className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
+          >
+            copy
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              updateCurrent({ input: "", output: "", error: "", tree: null });
+              setStatus("");
+            }}
+            disabled={!current.input && !current.output}
+            className={`${buttonClass} border-transparent text-muted hover:border-border hover:text-foreground`}
+          >
+            clear
+          </button>
+        </div>
+
+        <div className="mb-4 min-h-6 text-xs" aria-live="polite">
+          {current.error ? (
+            <p className="text-terminal-red">
+              <span className="mr-2">[error]</span>
+              {current.error}
+            </p>
+          ) : status ? (
+            <p className="text-accent">
+              <span className="mr-2">[ok]</span>
+              {status}
+            </p>
+          ) : (
+            <p className="text-muted">
+              <span className="mr-2 text-accent">[ready]</span>
+              Processing happens locally. Nothing is uploaded.
+            </p>
+          )}
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.65fr)]">
           <label className="block">
             <span className="mb-2 block text-[11px] uppercase tracking-[0.16em] text-muted">
@@ -372,85 +446,6 @@ export default function DevTools() {
             />
           </div>
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {activeTool === "base64" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => run("encode")}
-                className={`${buttonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
-              >
-                encode
-              </button>
-              <button
-                type="button"
-                onClick={() => run("decode")}
-                className={`${buttonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
-              >
-                decode
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => run("format")}
-              className={`${buttonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
-            >
-              beautify {activeTool}
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => void copyOutput(false)}
-            disabled={!current.output}
-            className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
-          >
-            {activeTool === "json" ? "copy raw" : "copy output"}
-          </button>
-          {activeTool === "json" ? (
-            <button
-              type="button"
-              onClick={() => void copyOutput(true)}
-              disabled={!current.output}
-              title="Parse nested JSON strings into objects and arrays before copying"
-              className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
-            >
-              copy parsed
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              updateCurrent({ input: "", output: "", error: "", tree: null });
-              setStatus("");
-            }}
-            disabled={!current.input && !current.output}
-            className={`${buttonClass} border-transparent text-muted hover:border-border hover:text-foreground`}
-          >
-            clear
-          </button>
-        </div>
-
-        <div className="mt-4 min-h-6 text-xs" aria-live="polite">
-          {current.error ? (
-            <p className="text-terminal-red">
-              <span className="mr-2">[error]</span>
-              {current.error}
-            </p>
-          ) : status ? (
-            <p className="text-accent">
-              <span className="mr-2">[ok]</span>
-              {status}
-            </p>
-          ) : (
-            <p className="text-muted">
-              <span className="mr-2 text-accent">[ready]</span>
-              Processing happens locally. Nothing is uploaded.
-            </p>
-          )}
-        </div>
           </>
         )}
       </div>
@@ -485,23 +480,17 @@ export default function DevTools() {
               ) : null}
               <button
                 type="button"
-                onClick={() => void copyOutput(false)}
+                onClick={() => void copyOutput()}
                 disabled={!current.output}
+                title={
+                  activeTool === "json"
+                    ? "Parse nested JSON strings into objects and arrays before copying"
+                    : undefined
+                }
                 className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
               >
-                {activeTool === "json" ? "copy raw" : "copy"}
+                copy value
               </button>
-              {activeTool === "json" ? (
-                <button
-                  type="button"
-                  onClick={() => void copyOutput(true)}
-                  disabled={!current.output}
-                  title="Parse nested JSON strings into objects and arrays before copying"
-                  className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
-                >
-                  copy parsed
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={() => setFullscreen(false)}
