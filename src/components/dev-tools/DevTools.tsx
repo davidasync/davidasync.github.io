@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import TerminalWindow from "@/components/TerminalWindow";
 import { decodeBase64, encodeBase64 } from "@/lib/dev-tools/base64";
-import { decodeSharedDiffHash } from "@/lib/dev-tools/diff-share";
 import {
   buildFormatterTree,
   formatJsonWithExpandedStrings,
@@ -15,6 +14,38 @@ import DiffChecker from "./DiffChecker";
 import TreeView from "./TreeView";
 
 type ToolId = "base64" | "diff" | Formatter;
+
+const toolIds = ["json", "yaml", "xml", "diff", "base64"] as const satisfies readonly ToolId[];
+
+function isToolId(value: string | null): value is ToolId {
+  return toolIds.some((id) => id === value);
+}
+
+function parseToolId(value: string | null) {
+  const id = value?.trim().toLowerCase() ?? null;
+  return isToolId(id) ? id : null;
+}
+
+function readToolFromUrl() {
+  if (window.location.hash.startsWith("#diff=")) return "diff" as const;
+  return parseToolId(new URLSearchParams(window.location.search).get("tool")) ?? "json";
+}
+
+function writeToolToUrl(id: ToolId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("tool", id);
+
+  if (id !== "diff") {
+    url.hash = "";
+  }
+
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+  if (next !== current) {
+    window.history.replaceState(null, "", next);
+  }
+}
 
 function isFormatter(id: ToolId): id is Formatter {
   return id === "json" || id === "yaml" || id === "xml";
@@ -210,18 +241,18 @@ export default function DevTools() {
   const current = toolStates[activeTool];
 
   useEffect(() => {
-    const openSharedDiff = () => {
-      if (decodeSharedDiffHash(window.location.hash)) {
-        setActiveTool("diff");
-      }
+    const syncFromUrl = () => {
+      setActiveTool(readToolFromUrl());
     };
 
-    const timer = window.setTimeout(openSharedDiff, 0);
-    window.addEventListener("hashchange", openSharedDiff);
+    const timer = window.setTimeout(syncFromUrl, 0);
+    window.addEventListener("hashchange", syncFromUrl);
+    window.addEventListener("popstate", syncFromUrl);
 
     return () => {
       window.clearTimeout(timer);
-      window.removeEventListener("hashchange", openSharedDiff);
+      window.removeEventListener("hashchange", syncFromUrl);
+      window.removeEventListener("popstate", syncFromUrl);
     };
   }, []);
 
@@ -297,15 +328,7 @@ export default function DevTools() {
 
   const selectTool = (id: ToolId) => {
     setFullscreen(false);
-
-    if (id !== "diff" && window.location.hash.startsWith("#diff=")) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}`,
-      );
-    }
-
+    writeToolToUrl(id);
     setActiveTool(id);
     setStatus("");
   };
