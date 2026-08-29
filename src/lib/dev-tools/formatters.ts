@@ -17,6 +17,7 @@ export type TreeNode = {
   value?: string;
   children?: TreeNode[];
   nestedJson?: boolean;
+  rawValue?: string;
 };
 
 export function formatJson(value: string) {
@@ -26,6 +27,51 @@ export function formatJson(value: string) {
     const message = error instanceof Error ? error.message : "Invalid JSON.";
     throw new Error(`Invalid JSON: ${message}`);
   }
+}
+
+export function formatJsonWithExpandedStrings(value: string) {
+  try {
+    return JSON.stringify(expandJsonStrings(JSON.parse(value)), null, 2);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`Invalid JSON: ${message}`);
+  }
+}
+
+function expandJsonStrings(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(expandJsonStrings);
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        expandJsonStrings(item),
+      ]),
+    );
+  }
+
+  if (typeof value !== "string") return value;
+
+  const trimmed = value.trim();
+  const mightBeStructuredJson =
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+  if (!mightBeStructuredJson) return value;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+
+    if (parsed !== null && typeof parsed === "object") {
+      return expandJsonStrings(parsed);
+    }
+  } catch {
+    // Preserve malformed and ordinary strings.
+  }
+
+  return value;
 }
 
 export function formatYaml(value: string) {
@@ -112,6 +158,83 @@ function indentXmlElement(
   }
 }
 
+export function formatTreeNodeValue(
+  node: TreeNode,
+  mode: "raw" | "parsed",
+) {
+  const value = treeToCopiedValue(node, mode === "parsed");
+
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+function treeToCopiedValue(node: TreeNode, expand: boolean): unknown {
+  if (!expand && node.nestedJson && node.rawValue !== undefined) {
+    return node.rawValue;
+  }
+
+  switch (node.type) {
+    case "object":
+      return Object.fromEntries(
+        (node.children ?? []).map((child) => [
+          child.label,
+          treeToCopiedValue(child, expand),
+        ]),
+      );
+    case "array":
+      return (node.children ?? []).map((child) =>
+        treeToCopiedValue(child, expand),
+      );
+    case "number": {
+      const parsed = Number(node.value);
+      return node.value !== undefined && Number.isFinite(parsed)
+        ? parsed
+        : node.value;
+    }
+    case "boolean":
+      return node.value === "true";
+    case "null":
+      return null;
+    case "element":
+      return serializeXmlElement(node);
+    default:
+      return node.value ?? "";
+  }
+}
+
+function serializeXmlElement(node: TreeNode): string {
+  const attributes = (node.children ?? [])
+    .filter((child) => child.type === "attribute")
+    .map(
+      (child) =>
+        `${child.label.replace(/^@/, "")}="${escapeXmlAttribute(child.value ?? "")}"`,
+    )
+    .join(" ");
+  const inner = (node.children ?? [])
+    .filter((child) => child.type !== "attribute")
+    .map((child) =>
+      child.type === "element"
+        ? serializeXmlElement(child)
+        : escapeXmlText(child.value ?? ""),
+    )
+    .join("");
+  const attributePart = attributes ? ` ${attributes}` : "";
+
+  if (!inner) return `<${node.label}${attributePart}/>`;
+  return `<${node.label}${attributePart}>${inner}</${node.label}>`;
+}
+
+function escapeXmlText(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapeXmlAttribute(value: string) {
+  return escapeXmlText(value).replaceAll('"', "&quot;");
+}
+
 export function formatValue(formatter: Formatter, value: string) {
   switch (formatter) {
     case "json":
@@ -195,6 +318,7 @@ function valueToTree(
           return {
             ...valueToTree(label, parsed, visited, true),
             nestedJson: true,
+            rawValue: value,
           };
         }
       } catch {

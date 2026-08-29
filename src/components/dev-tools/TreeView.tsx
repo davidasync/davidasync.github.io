@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import type { TreeNode } from "@/lib/dev-tools/formatters";
+import {
+  formatTreeNodeValue,
+  type TreeNode,
+} from "@/lib/dev-tools/formatters";
 
 type TreeViewProps = {
   root: TreeNode;
   fullscreen?: boolean;
 };
+
+type CopiedAction = "path" | "raw" | "parsed";
+
+const copyButtonClass =
+  "shrink-0 rounded-sm border border-border px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted transition hover:border-accent/60 hover:text-accent";
 
 export default function TreeView({
   root,
@@ -16,23 +24,31 @@ export default function TreeView({
   const [selection, setSelection] = useState<{
     root: TreeNode;
     path: string;
+    node: TreeNode;
   } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const selectedPath =
-    selection?.root === root ? selection.path : rootPath;
+  const [copied, setCopied] = useState<CopiedAction | null>(null);
+  const selected =
+    selection?.root === root
+      ? selection
+      : { path: rootPath, node: root };
   const pathType = root.type === "element" ? "XPath" : "JSONPath";
 
-  const selectPath = (path: string) => {
-    setSelection({ root, path });
-    setCopied(false);
+  const selectPath = (path: string, node: TreeNode) => {
+    setSelection({ root, path, node });
+    setCopied(null);
   };
 
-  const copyPath = async () => {
+  const copy = async (action: CopiedAction) => {
+    const value =
+      action === "path"
+        ? selected.path
+        : formatTreeNodeValue(selected.node, action);
+
     try {
-      await navigator.clipboard.writeText(selectedPath);
-      setCopied(true);
+      await navigator.clipboard.writeText(value);
+      setCopied(action);
     } catch {
-      setCopied(false);
+      setCopied(null);
     }
   };
 
@@ -43,30 +59,48 @@ export default function TreeView({
       }`}
       aria-label="Structured tree output"
     >
-      <div className="sticky top-0 z-10 mb-3 flex min-w-0 items-center gap-2 rounded-sm border border-border bg-surface/95 px-3 py-2 shadow-sm backdrop-blur-sm">
-        <span className="shrink-0 text-[9px] uppercase tracking-[0.14em] text-muted">
-          {pathType}
-        </span>
-        <code
-          className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-[11px] text-terminal-cyan"
-          title={selectedPath}
-        >
-          {selectedPath}
-        </code>
-        <button
-          type="button"
-          onClick={copyPath}
-          className="shrink-0 rounded-sm border border-border px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted transition hover:border-accent/60 hover:text-accent"
-        >
-          {copied ? "copied" : "copy path"}
-        </button>
+      <div className="sticky top-0 z-10 mb-3 flex min-w-0 flex-col gap-2 rounded-sm border border-border bg-surface/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-[9px] uppercase tracking-[0.14em] text-muted">
+            {pathType}
+          </span>
+          <code
+            className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-[11px] text-terminal-cyan"
+            title={selected.path}
+          >
+            {selected.path}
+          </code>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => void copy("path")}
+            className={copyButtonClass}
+          >
+            {copied === "path" ? "copied" : "copy path"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void copy("raw")}
+            className={copyButtonClass}
+          >
+            {copied === "raw" ? "copied" : "copy raw"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void copy("parsed")}
+            className={copyButtonClass}
+          >
+            {copied === "parsed" ? "copied" : "copy parsed"}
+          </button>
+        </div>
       </div>
 
       <TreeBranch
         node={root}
         depth={0}
         path={rootPath}
-        selectedPath={selectedPath}
+        selectedPath={selected.path}
         onSelect={selectPath}
       />
     </div>
@@ -84,7 +118,7 @@ function TreeBranch({
   depth: number;
   path: string;
   selectedPath: string;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, node: TreeNode) => void;
 }) {
   const hasChildren = node.children !== undefined;
   const [expanded, setExpanded] = useState(depth < 2);
@@ -95,7 +129,7 @@ function TreeBranch({
       <button
         type="button"
         aria-pressed={selected}
-        onClick={() => onSelect(path)}
+        onClick={() => onSelect(path, node)}
         className={`flex w-full min-w-0 items-start gap-2 rounded-sm pr-2 pl-5 text-left transition ${
           selected ? "bg-accent-soft" : "hover:bg-accent-soft/60"
         }`}
@@ -122,7 +156,7 @@ function TreeBranch({
         aria-expanded={expanded}
         aria-pressed={selected}
         onClick={() => {
-          onSelect(path);
+          onSelect(path, node);
           setExpanded((value) => !value);
         }}
         className={`group flex max-w-full items-center gap-2 rounded-sm pr-2 text-left transition ${

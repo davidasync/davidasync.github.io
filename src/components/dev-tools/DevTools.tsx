@@ -6,6 +6,7 @@ import { decodeBase64, encodeBase64 } from "@/lib/dev-tools/base64";
 import { decodeSharedDiffHash } from "@/lib/dev-tools/diff-share";
 import {
   buildFormatterTree,
+  formatJsonWithExpandedStrings,
   formatValue,
   type Formatter,
   type TreeNode,
@@ -225,12 +226,20 @@ export default function DevTools() {
     }
   };
 
-  const copyOutput = async () => {
+  const copyOutput = async (expandJsonStrings: boolean) => {
     if (!current.output) return;
 
     try {
-      await navigator.clipboard.writeText(current.output);
-      setStatus("Output copied to clipboard.");
+      const value = expandJsonStrings
+        ? formatJsonWithExpandedStrings(current.output)
+        : current.output;
+
+      await navigator.clipboard.writeText(value);
+      setStatus(
+        expandJsonStrings
+          ? "Parsed JSON copied to clipboard."
+          : "Output copied to clipboard.",
+      );
     } catch {
       setStatus("Clipboard access was denied.");
     }
@@ -394,12 +403,23 @@ export default function DevTools() {
 
           <button
             type="button"
-            onClick={copyOutput}
+            onClick={() => void copyOutput(false)}
             disabled={!current.output}
             className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
           >
-            copy output
+            {activeTool === "json" ? "copy raw" : "copy output"}
           </button>
+          {activeTool === "json" ? (
+            <button
+              type="button"
+              onClick={() => void copyOutput(true)}
+              disabled={!current.output}
+              title="Parse nested JSON strings into objects and arrays before copying"
+              className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
+            >
+              copy parsed
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -465,12 +485,23 @@ export default function DevTools() {
               ) : null}
               <button
                 type="button"
-                onClick={copyOutput}
+                onClick={() => void copyOutput(false)}
                 disabled={!current.output}
                 className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
               >
-                copy
+                {activeTool === "json" ? "copy raw" : "copy"}
               </button>
+              {activeTool === "json" ? (
+                <button
+                  type="button"
+                  onClick={() => void copyOutput(true)}
+                  disabled={!current.output}
+                  title="Parse nested JSON strings into objects and arrays before copying"
+                  className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
+                >
+                  copy parsed
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setFullscreen(false)}
