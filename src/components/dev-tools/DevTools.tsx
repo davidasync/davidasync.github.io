@@ -15,6 +15,44 @@ import DiffChecker from "./DiffChecker";
 import TreeView from "./TreeView";
 
 type ToolId = "base64" | "diff" | Formatter;
+
+function isFormatter(id: ToolId): id is Formatter {
+  return id === "json" || id === "yaml" || id === "xml";
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en").format(value);
+}
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${formatCount(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function measureText(value: string) {
+  const bytes = new TextEncoder().encode(value).byteLength;
+  const chars = [...value].length;
+  const lines = value === "" ? 0 : value.split(/\r\n|\r|\n/).length;
+  return { bytes, chars, lines };
+}
+
+function TextStats({ value }: { value: string }) {
+  if (!value) return null;
+
+  const stats = measureText(value);
+
+  return (
+    <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-muted">
+      {formatSize(stats.bytes)}
+      <span className="mx-2 text-border">·</span>
+      {formatCount(stats.chars)} chars
+      <span className="mx-2 text-border">·</span>
+      {formatCount(stats.lines)} {stats.lines === 1 ? "line" : "lines"}
+    </p>
+  );
+}
+
 type OutputMode = "tree" | "text";
 
 type ToolState = {
@@ -84,6 +122,9 @@ const emptyState = (): Record<ToolId, ToolState> => ({
 
 const buttonClass =
   "inline-flex items-center justify-center rounded-sm border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
+
+const headerButtonClass =
+  "inline-flex items-center justify-center rounded-sm border px-2 py-1 text-[10px] uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50";
 
 function OutputModeToggle({
   value,
@@ -159,6 +200,7 @@ function OutputViewer({
 
 export default function DevTools() {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const stdoutRef = useRef<HTMLDivElement>(null);
   const [activeTool, setActiveTool] = useState<ToolId>("json");
   const [toolStates, setToolStates] = useState(emptyState);
   const [outputView, setOutputView] = useState<OutputMode>("tree");
@@ -208,10 +250,11 @@ export default function DevTools() {
       let output: string;
       let tree: TreeNode | null = null;
 
-      if (action === "encode") {
-        output = encodeBase64(current.input);
-      } else if (action === "decode") {
-        output = decodeBase64(current.input);
+      if (action === "encode" || action === "decode") {
+        output =
+          action === "encode"
+            ? encodeBase64(current.input)
+            : decodeBase64(current.input);
       } else {
         const formatter = activeTool as Formatter;
         output = formatValue(formatter, current.input);
@@ -219,6 +262,12 @@ export default function DevTools() {
       }
 
       updateCurrent({ output, tree, error: "" });
+      window.requestAnimationFrame(() => {
+        stdoutRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
     } catch (error) {
       updateCurrent({
         error: error instanceof Error ? error.message : "Unable to process input.",
@@ -326,60 +375,6 @@ export default function DevTools() {
           <DiffChecker />
         ) : (
           <>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {activeTool === "base64" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => run("encode")}
-                className={`${buttonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
-              >
-                encode
-              </button>
-              <button
-                type="button"
-                onClick={() => run("decode")}
-                className={`${buttonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
-              >
-                decode
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => run("format")}
-              className={`${buttonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
-            >
-              beautify
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => void copyOutput()}
-            disabled={!current.output}
-            title={
-              activeTool === "json"
-                ? "Parse nested JSON strings into objects and arrays before copying"
-                : undefined
-            }
-            className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
-          >
-            copy
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              updateCurrent({ input: "", output: "", error: "", tree: null });
-              setStatus("");
-            }}
-            disabled={!current.input && !current.output}
-            className={`${buttonClass} border-transparent text-muted hover:border-border hover:text-foreground`}
-          >
-            clear
-          </button>
-        </div>
-
         <div className="mb-4 min-h-6 text-xs" aria-live="polite">
           {current.error ? (
             <p className="text-terminal-red">
@@ -399,24 +394,72 @@ export default function DevTools() {
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.65fr)]">
-          <label className="block">
-            <span className="mb-2 block text-[11px] uppercase tracking-[0.16em] text-muted">
-              stdin
-            </span>
+        <div className="grid gap-4">
+          <div className="block">
+            <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                stdin
+              </span>
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                {activeTool === "base64" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => run("encode")}
+                      className={`${headerButtonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
+                    >
+                      encode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => run("decode")}
+                      className={`${headerButtonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
+                    >
+                      decode
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => run("format")}
+                    className={`${headerButtonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
+                  >
+                    beautify
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateCurrent({
+                      input: "",
+                      output: "",
+                      error: "",
+                      tree: null,
+                    });
+                    setStatus("");
+                  }}
+                  disabled={!current.input && !current.output}
+                  className={`${headerButtonClass} border-transparent text-muted hover:border-border hover:text-foreground`}
+                >
+                  clear
+                </button>
+              </div>
+            </div>
             <textarea
               value={current.input}
               onChange={(event) => {
                 updateCurrent({ input: event.target.value, error: "" });
                 setStatus("");
               }}
+              aria-label="stdin"
               placeholder={tool.inputPlaceholder}
               spellCheck={false}
               className="min-h-72 w-full resize-y rounded-sm border border-border bg-background/70 p-4 text-sm leading-6 text-foreground transition placeholder:text-muted/55 hover:border-accent/40 focus:border-accent focus:outline-none"
             />
-          </label>
+            {isFormatter(activeTool) ? <TextStats value={current.input} /> : null}
+          </div>
 
-          <div className="block">
+          <div ref={stdoutRef} className="block scroll-mt-20">
             <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
               <span className="text-[11px] uppercase tracking-[0.16em] text-muted">
                 stdout
@@ -444,6 +487,9 @@ export default function DevTools() {
               current={current}
               outputView={outputView}
             />
+            {isFormatter(activeTool) ? (
+              <TextStats value={current.output} />
+            ) : null}
           </div>
         </div>
           </>

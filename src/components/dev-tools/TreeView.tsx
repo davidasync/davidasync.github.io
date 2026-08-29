@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatTreeNodeValue,
   type TreeNode,
@@ -13,6 +13,12 @@ type TreeViewProps = {
 
 type CopiedAction = "path" | "parsed";
 type Expansion = "default" | "all" | "none";
+type ContextMenuState = {
+  x: number;
+  y: number;
+  path: string;
+  node: TreeNode;
+};
 
 const copyButtonClass =
   "shrink-0 rounded-sm border border-border px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted transition hover:border-accent/60 hover:text-accent";
@@ -30,6 +36,9 @@ export default function TreeView({
   const [copied, setCopied] = useState<CopiedAction | null>(null);
   const [expansion, setExpansion] = useState<Expansion>("default");
   const [expansionVersion, setExpansionVersion] = useState(0);
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const selected =
     selection?.root === root
       ? selection
@@ -39,28 +48,86 @@ export default function TreeView({
   useEffect(() => {
     setExpansion("default");
     setExpansionVersion(0);
+    setMenu(null);
   }, [root]);
+
+  useEffect(() => {
+    if (!menu) return;
+
+    const close = () => setMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      close();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menu]);
 
   const selectPath = (path: string, node: TreeNode) => {
     setSelection({ root, path, node });
     setCopied(null);
   };
 
-  const copy = async (action: CopiedAction) => {
+  const openMenu = (
+    event: React.MouseEvent,
+    path: string,
+    node: TreeNode,
+  ) => {
+    event.preventDefault();
+    selectPath(path, node);
+
+    const bounds = containerRef.current?.getBoundingClientRect();
+    const width = 168;
+    const height = 76;
+    const left = bounds?.left ?? 0;
+    const top = bounds?.top ?? 0;
+    const maxX = (bounds?.width ?? window.innerWidth) - width - 8;
+    const maxY = (bounds?.height ?? window.innerHeight) - height - 8;
+
+    setMenu({
+      x: Math.max(8, Math.min(event.clientX - left, maxX)),
+      y: Math.max(8, Math.min(event.clientY - top, maxY)),
+      path,
+      node,
+    });
+  };
+
+  const copy = async (
+    action: CopiedAction,
+    target: { path: string; node: TreeNode } = selected,
+  ) => {
     const value =
       action === "path"
-        ? selected.path
-        : formatTreeNodeValue(selected.node);
+        ? target.path
+        : formatTreeNodeValue(target.node);
 
     try {
       await navigator.clipboard.writeText(value);
       setCopied(action);
+      setMenu(null);
     } catch {
       setCopied(null);
     }
   };
 
   return (
+    <div
+      ref={containerRef}
+      className={`relative ${fullscreen ? "flex min-h-0 flex-1 flex-col" : ""}`}
+    >
     <div
       className={`overflow-auto rounded-sm border border-border bg-surface-2/70 p-3 text-xs leading-6 sm:p-4 ${
         fullscreen ? "min-h-0 flex-1" : "min-h-72 max-h-[36rem]"
@@ -115,8 +182,37 @@ export default function TreeView({
         path={rootPath}
         selectedPath={selected.path}
         onSelect={selectPath}
+        onMenu={openMenu}
         expansion={expansion}
       />
+
+    </div>
+      {menu ? (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Tree node actions"
+          style={{ left: menu.x, top: menu.y }}
+          className="absolute z-50 min-w-40 rounded-sm border border-border bg-surface py-1 shadow-[0_16px_40px_var(--terminal-shadow)]"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void copy("path", menu)}
+            className="flex w-full px-3 py-1.5 text-left text-[10px] uppercase tracking-wide text-muted transition hover:bg-accent-soft hover:text-accent"
+          >
+            copy path
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void copy("parsed", menu)}
+            className="flex w-full px-3 py-1.5 text-left text-[10px] uppercase tracking-wide text-muted transition hover:bg-accent-soft hover:text-accent"
+          >
+            copy value
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -127,6 +223,7 @@ function TreeBranch({
   path,
   selectedPath,
   onSelect,
+  onMenu,
   expansion,
 }: {
   node: TreeNode;
@@ -134,6 +231,7 @@ function TreeBranch({
   path: string;
   selectedPath: string;
   onSelect: (path: string, node: TreeNode) => void;
+  onMenu: (event: React.MouseEvent, path: string, node: TreeNode) => void;
   expansion: Expansion;
 }) {
   const hasChildren = node.children !== undefined;
@@ -146,6 +244,7 @@ function TreeBranch({
         type="button"
         aria-pressed={selected}
         onClick={() => onSelect(path, node)}
+        onContextMenu={(event) => onMenu(event, path, node)}
         className={`flex w-full min-w-0 items-start gap-2 rounded-sm pr-2 pl-5 text-left transition ${
           selected ? "bg-accent-soft" : "hover:bg-accent-soft/60"
         }`}
@@ -175,6 +274,7 @@ function TreeBranch({
           onSelect(path, node);
           setExpanded((value) => !value);
         }}
+        onContextMenu={(event) => onMenu(event, path, node)}
         className={`group flex max-w-full items-center gap-2 rounded-sm pr-2 text-left transition ${
           selected ? "bg-accent-soft" : "hover:bg-accent-soft/60"
         }`}
@@ -209,6 +309,7 @@ function TreeBranch({
                 path={childPath(path, node, child, index)}
                 selectedPath={selectedPath}
                 onSelect={onSelect}
+                onMenu={onMenu}
                 expansion={expansion}
               />
             ))
