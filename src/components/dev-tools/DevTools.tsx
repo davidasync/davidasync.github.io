@@ -10,6 +10,12 @@ import {
   type Formatter,
   type TreeNode,
 } from "@/lib/dev-tools/formatters";
+import {
+  clearToolSpec,
+  readTextSpec,
+  writeTextSpec,
+  type TextToolId,
+} from "@/lib/dev-tools/storage";
 import DiffChecker from "./DiffChecker";
 import JwtTool from "./JwtTool";
 import TreeView from "./TreeView";
@@ -50,6 +56,10 @@ function writeToolToUrl(id: ToolId) {
 
 function isFormatter(id: ToolId): id is Formatter {
   return id === "json" || id === "yaml" || id === "xml";
+}
+
+function isTextTool(id: ToolId): id is TextToolId {
+  return id === "base64" || isFormatter(id);
 }
 
 function formatCount(value: number) {
@@ -251,11 +261,43 @@ export default function DevTools() {
   const current = toolStates[activeTool];
 
   useEffect(() => {
+    const restoreSpecs = () => {
+      setToolStates((states) => {
+        const next = { ...states };
+
+        for (const id of ["json", "yaml", "xml", "base64"] as const) {
+          const stored = readTextSpec(id);
+          if (!stored) continue;
+
+          let tree: TreeNode | null = null;
+          if (id !== "base64" && stored.output) {
+            try {
+              tree = buildFormatterTree(id, stored.output);
+            } catch {
+              tree = null;
+            }
+          }
+
+          next[id] = {
+            input: stored.input,
+            output: stored.output,
+            error: "",
+            tree,
+          };
+        }
+
+        return next;
+      });
+    };
+
     const syncFromUrl = () => {
       setActiveTool(readToolFromUrl());
     };
 
-    const timer = window.setTimeout(syncFromUrl, 0);
+    const timer = window.setTimeout(() => {
+      restoreSpecs();
+      syncFromUrl();
+    }, 0);
     window.addEventListener("hashchange", syncFromUrl);
     window.addEventListener("popstate", syncFromUrl);
 
@@ -303,6 +345,9 @@ export default function DevTools() {
       }
 
       updateCurrent({ output, tree, error: "" });
+      if (isTextTool(activeTool)) {
+        writeTextSpec(activeTool, { input: current.input, output });
+      }
       window.requestAnimationFrame(() => {
         stdoutRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -465,6 +510,9 @@ export default function DevTools() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (isTextTool(activeTool)) {
+                      clearToolSpec(activeTool);
+                    }
                     updateCurrent({
                       input: "",
                       output: "",

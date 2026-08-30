@@ -17,6 +17,11 @@ import {
   type JwtAlgorithm,
   type JwtParseResult,
 } from "@/lib/dev-tools/jwt";
+import {
+  clearToolSpec,
+  readJwtSpec,
+  writeJwtSpec,
+} from "@/lib/dev-tools/storage";
 
 type Mode = "decode" | "encode";
 type Notice = { kind: "success" | "error"; message: string };
@@ -44,6 +49,25 @@ export default function JwtTool() {
   const [algorithm, setAlgorithm] = useState<JwtAlgorithm>("HS256");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [signature, setSignature] = useState<SignatureState | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const stored = readJwtSpec();
+      if (!stored) return;
+
+      setMode(stored.mode);
+      setToken(stored.token);
+      setHeaderText(stored.headerText);
+      setPayloadText(stored.payloadText);
+      setSecret(stored.secret);
+      setSecretIsBase64Url(stored.secretIsBase64Url);
+      if (isJwtAlgorithm(stored.algorithm)) {
+        setAlgorithm(stored.algorithm);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const parsed = useMemo(() => parseJwt(token), [token]);
   const decodedHeader = parsed.ok ? parsed.token.headerJson : "";
@@ -125,8 +149,18 @@ export default function JwtTool() {
         secretIsBase64Url,
       });
 
-      setHeaderText(JSON.stringify({ ...header, alg: algorithm }, null, 2));
+      const nextHeader = JSON.stringify({ ...header, alg: algorithm }, null, 2);
+      setHeaderText(nextHeader);
       setToken(next);
+      writeJwtSpec({
+        mode,
+        token: next,
+        headerText: nextHeader,
+        payloadText,
+        secret,
+        secretIsBase64Url,
+        algorithm,
+      });
       setNotice({
         kind: "success",
         message: `Token signed with ${algorithm}.`,
@@ -155,6 +189,15 @@ export default function JwtTool() {
       setSecret(EXAMPLE_JWT_SECRET);
       setSecretIsBase64Url(false);
       setToken(next);
+      writeJwtSpec({
+        mode: "decode",
+        token: next,
+        headerText: defaultHeader,
+        payloadText: defaultPayload,
+        secret: EXAMPLE_JWT_SECRET,
+        secretIsBase64Url: false,
+        algorithm: "HS256",
+      });
       setNotice({
         kind: "success",
         message: "Example HS256 token loaded.",
@@ -182,6 +225,7 @@ export default function JwtTool() {
   };
 
   const clear = () => {
+    clearToolSpec("jwt");
     setToken("");
     setHeaderText(defaultHeader);
     setPayloadText(defaultPayload);

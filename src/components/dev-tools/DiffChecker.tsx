@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createTwoFilesPatch,
   diffWordsWithSpace,
@@ -15,6 +15,11 @@ import {
   encodeSharedDiff,
   MAX_SHARE_URL_LENGTH,
 } from "@/lib/dev-tools/diff-share";
+import {
+  clearToolSpec,
+  readDiffSpec,
+  writeDiffSpec,
+} from "@/lib/dev-tools/storage";
 
 type Notice = {
   kind: "success" | "error";
@@ -43,6 +48,21 @@ export default function DiffChecker() {
       : null,
   );
 
+  useEffect(() => {
+    if (sharedDiff) return;
+
+    const timer = window.setTimeout(() => {
+      const stored = readDiffSpec();
+      if (!stored) return;
+
+      setOriginal(stored.original);
+      setChanged(stored.changed);
+      setResult(buildSideBySideDiff(stored.original, stored.changed));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [sharedDiff]);
+
   const clearSharedHash = () => {
     if (window.location.hash.startsWith("#diff=")) {
       window.history.replaceState(
@@ -65,6 +85,7 @@ export default function DiffChecker() {
 
   const compare = () => {
     setResult(buildSideBySideDiff(original, changed));
+    writeDiffSpec({ original, changed });
     setNotice(null);
   };
 
@@ -213,6 +234,7 @@ export default function DiffChecker() {
           type="button"
           onClick={() => {
             clearSharedHash();
+            clearToolSpec("diff");
             setOriginal("");
             setChanged("");
             setResult(null);
