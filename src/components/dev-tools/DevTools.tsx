@@ -11,11 +11,12 @@ import {
   type TreeNode,
 } from "@/lib/dev-tools/formatters";
 import DiffChecker from "./DiffChecker";
+import JwtTool from "./JwtTool";
 import TreeView from "./TreeView";
 
-type ToolId = "base64" | "diff" | Formatter;
+type ToolId = "base64" | "diff" | "jwt" | Formatter;
 
-const toolIds = ["json", "yaml", "xml", "diff", "base64"] as const satisfies readonly ToolId[];
+const toolIds = ["json", "yaml", "xml", "diff", "base64", "jwt"] as const satisfies readonly ToolId[];
 
 function isToolId(value: string | null): value is ToolId {
   return toolIds.some((id) => id === value);
@@ -135,18 +136,27 @@ const tools: Array<{
     description: "Encode or decode UTF-8 text locally in your browser.",
     inputPlaceholder: "Enter plain text or Base64...",
   },
+  {
+    id: "jwt",
+    label: "JWT",
+    command: "./jwt.sh --debug",
+    description:
+      "Decode, verify, and sign JSON Web Tokens locally in your browser.",
+    inputPlaceholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  },
 ];
 
 const toolGroups: Array<{ label: string; tools: ToolId[] }> = [
   { label: "Format", tools: ["json", "yaml", "xml"] },
   { label: "Compare", tools: ["diff"] },
-  { label: "Encode", tools: ["base64"] },
+  { label: "Encode", tools: ["base64", "jwt"] },
 ];
 
 const emptyState = (): Record<ToolId, ToolState> => ({
   base64: { input: "", output: "", error: "", tree: null },
   diff: { input: "", output: "", error: "", tree: null },
   json: { input: "", output: "", error: "", tree: null },
+  jwt: { input: "", output: "", error: "", tree: null },
   yaml: { input: "", output: "", error: "", tree: null },
   xml: { input: "", output: "", error: "", tree: null },
 });
@@ -396,6 +406,8 @@ export default function DevTools() {
 
         {activeTool === "diff" ? (
           <DiffChecker />
+        ) : activeTool === "jwt" ? (
+          <JwtTool />
         ) : (
           <>
         <div className="mb-4 min-h-6 text-xs" aria-live="polite">

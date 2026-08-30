@@ -6,7 +6,7 @@ import Nav from "@/components/Nav";
 export const metadata: Metadata = {
   title: "Dev Tools — davidasync",
   description:
-    "Browser-based text diff checker, Base64 encoder and decoder, and JSON, YAML, and XML beautifiers.",
+    "Browser-based text diff checker, JWT and Base64 encoders and decoders, and JSON, YAML, and XML beautifiers.",
 };
 
 export default function DevToolsPage() {
@@ -29,7 +29,8 @@ export default function DevToolsPage() {
             </h1>
             <p className="mt-4 text-sm leading-7 text-muted sm:text-base">
               Small browser utilities for formatting, comparing, and encoding
-              data. All processing stays on your device.
+              data — including JSON Web Tokens. All processing stays on your
+              device.
             </p>
           </header>
 
