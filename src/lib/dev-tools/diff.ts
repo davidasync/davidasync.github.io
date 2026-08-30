@@ -1,4 +1,4 @@
-import { diffArrays } from "diff";
+import { diffArrays, diffChars } from "diff";
 
 export type DiffCell = {
   line: number;
@@ -23,8 +23,6 @@ export function buildSideBySideDiff(
 ): DiffResult {
   const changes = diffArrays(textLines(original), textLines(changed));
   const rows: DiffRow[] = [];
-  let additions = 0;
-  let deletions = 0;
   let originalLine = 1;
   let changedLine = 1;
 
@@ -57,8 +55,6 @@ export function buildSideBySideDiff(
     }
 
     index -= 1;
-    additions += added.length;
-    deletions += removed.length;
 
     for (
       let lineIndex = 0;
@@ -91,7 +87,20 @@ export function buildSideBySideDiff(
     }
   }
 
+  const { additions, deletions } = countCharChanges(original, changed);
   return { rows, additions, deletions };
+}
+
+function countCharChanges(original: string, changed: string) {
+  let additions = 0;
+  let deletions = 0;
+
+  for (const part of diffChars(original, changed)) {
+    if (part.added) additions += part.value.length;
+    if (part.removed) deletions += part.value.length;
+  }
+
+  return { additions, deletions };
 }
 
 function textLines(value: string) {

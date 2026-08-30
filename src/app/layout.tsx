@@ -27,10 +27,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#edf3ec" },
-    { media: "(prefers-color-scheme: dark)", color: "#050806" },
-  ],
+  themeColor: "#0c0a0d",
 };
 
 // Runs before paint so the saved theme is applied without a flash of the wrong
@@ -39,13 +36,17 @@ const bootScript = `
 (function () {
   var root = document.documentElement;
   root.classList.add("js");
+  var stored = null;
   try {
-    var stored = localStorage.getItem("theme");
-    var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    if (stored === "dark" || (!stored && prefersDark)) {
-      root.classList.add("dark");
-    }
+    stored = localStorage.getItem("theme");
   } catch (e) {}
+  root.classList.remove("dark", "black-cat");
+  if (stored === "light") return;
+  if (stored === "dark") {
+    root.classList.add("dark");
+    return;
+  }
+  root.classList.add("dark", "black-cat");
 })();
 `;
 

@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  createTwoFilesPatch,
-  diffWordsWithSpace,
-} from "diff";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { diffWordsWithSpace } from "diff";
 import {
   buildSideBySideDiff,
   type DiffCell,
   type DiffResult,
 } from "@/lib/dev-tools/diff";
+import { openNodePng } from "@/lib/dev-tools/diff-screenshot";
 import {
   decodeSharedDiffHash,
   encodeSharedDiff,
@@ -47,6 +45,7 @@ export default function DiffChecker() {
       ? { kind: "success", message: "Shared comparison loaded." }
       : null,
   );
+  const outputRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (sharedDiff) return;
@@ -89,24 +88,6 @@ export default function DiffChecker() {
     setNotice(null);
   };
 
-  const copyPatch = async () => {
-    try {
-      const patch = createTwoFilesPatch(
-        "original.txt",
-        "changed.txt",
-        original,
-        changed,
-      );
-      await navigator.clipboard.writeText(patch);
-      setNotice({
-        kind: "success",
-        message: "Unified diff copied to clipboard.",
-      });
-    } catch {
-      setNotice({ kind: "error", message: "Clipboard access was denied." });
-    }
-  };
-
   const share = async () => {
     const encoded = encodeSharedDiff({ original, changed });
     const url = `${window.location.origin}${window.location.pathname}${window.location.search}#diff=${encoded}`;
@@ -115,7 +96,7 @@ export default function DiffChecker() {
       setNotice({
         kind: "error",
         message:
-          "This comparison is too large for a reliable share link. Download the diff instead.",
+          "This comparison is too large for a reliable share link. Try a smaller diff or open a PNG instead.",
       });
       return;
     }
@@ -132,30 +113,32 @@ export default function DiffChecker() {
     }
   };
 
-  const downloadPatch = () => {
-    const patch = createTwoFilesPatch(
-      "original.txt",
-      "changed.txt",
-      original,
-      changed,
-    );
-    const url = URL.createObjectURL(
-      new Blob([patch], { type: "text/x-diff;charset=utf-8" }),
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "comparison.diff";
-    link.click();
-    URL.revokeObjectURL(url);
-    setNotice({ kind: "success", message: "Diff file downloaded." });
-  };
+  const screenshot = async () => {
+    const node = outputRef.current;
+    if (!node) return;
 
-  const swap = () => {
-    clearSharedHash();
-    setOriginal(changed);
-    setChanged(original);
-    setResult(null);
-    setNotice(null);
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      setNotice({
+        kind: "error",
+        message: "The browser blocked the new tab. Allow popups to view the PNG.",
+      });
+      return;
+    }
+
+    try {
+      await openNodePng(node, tab);
+      setNotice({
+        kind: "success",
+        message: "Difference image opened in a new tab.",
+      });
+    } catch {
+      setNotice({
+        kind: "error",
+        message:
+          "Unable to capture this comparison. Try a smaller diff.",
+      });
+    }
   };
 
   return (
@@ -200,22 +183,6 @@ export default function DiffChecker() {
         </button>
         <button
           type="button"
-          onClick={swap}
-          disabled={!original && !changed}
-          className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
-        >
-          swap sides
-        </button>
-        <button
-          type="button"
-          onClick={copyPatch}
-          disabled={!result}
-          className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
-        >
-          copy unified diff
-        </button>
-        <button
-          type="button"
           onClick={share}
           disabled={!original && !changed}
           className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
@@ -224,11 +191,11 @@ export default function DiffChecker() {
         </button>
         <button
           type="button"
-          onClick={downloadPatch}
+          onClick={() => void screenshot()}
           disabled={!result}
           className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
         >
-          download .diff
+          open png
         </button>
         <button
           type="button"
@@ -268,24 +235,37 @@ export default function DiffChecker() {
         )}
       </div>
 
-      {result ? <DiffOutput result={result} /> : null}
+      {result ? <DiffOutput result={result} outputRef={outputRef} /> : null}
     </div>
   );
 }
 
-function DiffOutput({ result }: { result: DiffResult }) {
+function DiffOutput({
+  result,
+  outputRef,
+}: {
+  result: DiffResult;
+  outputRef: RefObject<HTMLElement | null>;
+}) {
   const identical = result.additions === 0 && result.deletions === 0;
 
   return (
-    <section className="mt-6" aria-label="Text comparison result">
+    <section
+      ref={outputRef}
+      className="mt-6"
+      aria-label="Text comparison result"
+    >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xs text-foreground">
           <span className="mr-2 text-accent">$</span>
           diff --side-by-side original.txt changed.txt
         </h2>
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-wide">
-          <span className="text-terminal-red">-{result.deletions}</span>
-          <span className="text-accent">+{result.additions}</span>
+          <span className="text-terminal-red">
+            -{formatCount(result.deletions)}
+          </span>
+          <span className="text-accent">+{formatCount(result.additions)}</span>
+          <span className="text-muted">chars</span>
         </div>
       </div>
 
@@ -294,7 +274,10 @@ function DiffOutput({ result }: { result: DiffResult }) {
           [identical] No differences found.
         </div>
       ) : (
-        <div className="max-h-[42rem] overflow-auto rounded-sm border border-border bg-background/60">
+        <div
+          data-diff-scroll
+          className="max-h-[42rem] overflow-auto rounded-sm border border-border bg-background/60"
+        >
           <div className="min-w-[720px]">
             <div className="sticky top-0 z-10 grid grid-cols-2 border-b border-border bg-surface-2 text-[10px] uppercase tracking-[0.14em] text-muted">
               <div className="border-r border-border px-3 py-2">original</div>
@@ -405,4 +388,8 @@ function WordDiff({
 
 function lineCount(value: string) {
   return value === "" ? 0 : value.split("\n").length;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en").format(value);
 }

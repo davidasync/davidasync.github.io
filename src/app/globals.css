@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant black-cat (&:where(.black-cat, .black-cat *));
 
 :root {
   --background: #edf3ec;
@@ -36,6 +37,23 @@
   --scanline: rgba(92, 242, 135, 0.025);
 }
 
+.dark.black-cat {
+  --background: #0c0a0d;
+  --surface: #161318;
+  --surface-2: #1d191f;
+  --border: #3a3238;
+  --foreground: #f3eadc;
+  --muted: #9a8d8a;
+  --accent: #e8b84a;
+  --accent-soft: #2a2110;
+  --accent-contrast: #1a1408;
+  --terminal-cyan: #c9b8e8;
+  --terminal-yellow: #f0c14b;
+  --terminal-red: #e07a7a;
+  --terminal-shadow: rgba(0, 0, 0, 0.62);
+  --scanline: rgba(232, 184, 74, 0.04);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -59,7 +77,8 @@ html {
   color-scheme: light;
 }
 
-html.dark {
+html.dark,
+html.black-cat {
   color-scheme: dark;
 }
 

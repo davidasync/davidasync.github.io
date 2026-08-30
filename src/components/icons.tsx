@@ -102,6 +102,18 @@ export function MoonIcon(props: IconProps) {
   );
 }
 
+export function CatIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden {...strokeProps} {...props}>
+      <path d="M5.4 11.2 8 3.6l3.2 5.4L14.4 3.6l2.6 7.6" />
+      <path d="M5.5 11.4a6.5 6.5 0 0 0 13 0" />
+      <circle cx="9.3" cy="13" r="1" fill="currentColor" stroke="none" />
+      <circle cx="14.7" cy="13" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 14.4v1.3M10.5 16.6c.9.7 2.1.7 3 0" />
+    </svg>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden {...strokeProps} {...props}>
