@@ -33,7 +33,7 @@ export default function Hero() {
 
           <div className="mt-6 border-l-2 border-accent/50 pl-4 sm:pl-6">
             <p className="text-xs text-terminal-yellow">
-              {"// backend engineer · platform builder · technical leader"}
+              {"// software engineer · platform builder"}
             </p>
             <h1 className="mt-3 text-4xl font-medium tracking-tight text-foreground sm:text-6xl">
               {profile.name}

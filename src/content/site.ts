@@ -37,11 +37,11 @@ export type SkillGroup = {
 
 export const profile = {
   name: "davidasync",
-  role: "Technical Lead",
+  role: "Software Engineer",
   tagline:
     "I build scalable products and strengthen the engineering systems behind them — from partner APIs and cloud infrastructure to delivery, observability, and reliability.",
   location: "Jakarta, Indonesia",
-  status: "Technical Lead at tiket.com",
+  status: "Technical Leader at tiket.com",
   contactUrl:
     "https://www.linkedin.com/in/david-%E2%80%8F-2b66b6106/",
 };
@@ -62,8 +62,8 @@ export const socials: Social[] = [
 
 export const about = {
   paragraphs: [
-    "I’m a Technical Lead with more than a decade of experience building software products and the platforms that keep them reliable. I enjoy turning complex engineering problems into practical systems that teams can operate with confidence.",
-    "At tiket.com, I work in the Affiliate accommodation team and partner closely with Product to enable integrations through our APIs. I joined as a Senior Software Engineer in 2022 and moved into the Technical Lead role in 2025.",
+    "I’m a software engineer with more than a decade of experience building software products and the platforms that keep them reliable. I enjoy turning complex engineering problems into practical systems that teams can operate with confidence.",
+    "At tiket.com, I work in the Affiliate accommodation team and partner closely with Product to enable integrations through our APIs. I joined as a Senior Software Engineer in 2022.",
     "Previously, I worked across product engineering, cloud infrastructure, GitOps, observability, performance, and engineering excellence at LINE Indonesia and Traveloka, after earlier engineering roles at Cermati, IndoTrading, and BINUS.",
   ],
   facts: [
@@ -72,7 +72,7 @@ export const about = {
       value: "Backend systems, cloud infrastructure & reliability",
     },
     { label: "Experience", value: "11+ years in software engineering" },
-    { label: "Currently", value: "Technical Lead at tiket.com" },
+    { label: "Currently", value: "Technical Leader at tiket.com" },
     {
       label: "Education",
       value: "B.Sc. Computer Science, BINUS · GPA 3.80",
@@ -187,13 +187,13 @@ export const projects: Project[] = [
     year: "2021 — 2022",
   },
   {
-    title: "Open-source Developer Tools",
-    blurb: "Small utilities for cloud operations and developer workflows.",
+    title: "Developer Tools",
+    blurb: "Browser utilities for formatting, comparing, and encoding data.",
     description:
-      "Public work includes a self-hosted Google Drive API utility, a Kotlin user-agent generator, AWS operational scripts, and rolling-deployment automation.",
-    tech: ["Kotlin", "AWS", "Ansible", "Automation"],
-    year: "2016 — Present",
-    code: "https://github.com/davidasync",
+      "Local JSON, YAML, and XML beautifiers, a text diff checker, Base64 encode/decode, and a JWT debugger. All processing stays in the browser.",
+    tech: ["JSON", "YAML", "XML", "Diff", "Base64", "JWT"],
+    year: "2026",
+    demo: "/dev-tools/",
   },
 ];
 

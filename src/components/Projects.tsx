@@ -59,12 +59,15 @@ export default function Projects() {
                   {project.demo ? (
                     <a
                       href={project.demo}
-                      target="_blank"
-                      rel="noreferrer"
+                      {...(isExternalHref(project.demo)
+                        ? { target: "_blank", rel: "noreferrer" }
+                        : {})}
                       className="inline-flex items-center gap-1.5 text-xs text-muted transition hover:text-accent"
                     >
                       <ExternalIcon className="h-3.5 w-3.5" />
-                      open demo
+                      {isExternalHref(project.demo)
+                        ? "open demo"
+                        : "open ./dev-tools"}
                     </a>
                   ) : null}
                   {project.code ? (
@@ -86,4 +89,8 @@ export default function Projects() {
       </div>
     </Section>
   );
+}
+
+function isExternalHref(href: string) {
+  return /^https?:\/\//.test(href);
 }
