@@ -190,8 +190,8 @@ export const projects: Project[] = [
     title: "Developer Tools",
     blurb: "Browser utilities for formatting, comparing, and encoding data.",
     description:
-      "Local JSON, YAML, and XML beautifiers, a text diff checker, Base64 encode/decode, and a JWT debugger. All processing stays in the browser.",
-    tech: ["JSON", "YAML", "XML", "Diff", "Base64", "JWT"],
+      "Local JSON, YAML, and XML beautifiers, a text diff checker, Base64, string escape/unescape and JSON minify, and a JWT debugger. All processing stays in the browser.",
+    tech: ["JSON", "YAML", "XML", "Diff", "Base64", "Escape", "JWT"],
     year: "2026",
     demo: "/dev-tools/",
   },

@@ -1,6 +1,6 @@
 export const DEV_TOOLS_STORAGE_VERSION = 1;
 
-export type TextToolId = "base64" | "json" | "xml" | "yaml";
+export type TextToolId = "base64" | "escape" | "json" | "xml" | "yaml";
 export type StoredToolId = TextToolId | "diff" | "jwt";
 
 export type StoredTextSpec = {

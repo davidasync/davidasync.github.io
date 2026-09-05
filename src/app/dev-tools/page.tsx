@@ -6,7 +6,7 @@ import Nav from "@/components/Nav";
 export const metadata: Metadata = {
   title: "Dev Tools — davidasync",
   description:
-    "Browser-based text diff checker, JWT and Base64 encoders and decoders, and JSON, YAML, and XML beautifiers.",
+    "Browser-based text diff checker, JWT and Base64 encoders and decoders, string escape/unescape, and JSON, YAML, and XML beautifiers.",
 };
 
 export default function DevToolsPage() {

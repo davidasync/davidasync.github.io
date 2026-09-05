@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import TerminalWindow from "@/components/TerminalWindow";
 import { decodeBase64, encodeBase64 } from "@/lib/dev-tools/base64";
+import { escapeText, unescapeText } from "@/lib/dev-tools/escape";
 import {
   buildFormatterTree,
   formatJsonWithExpandedStrings,
   formatValue,
+  minifyJson,
   type Formatter,
   type TreeNode,
 } from "@/lib/dev-tools/formatters";
@@ -20,9 +22,17 @@ import DiffChecker from "./DiffChecker";
 import JwtTool from "./JwtTool";
 import TreeView from "./TreeView";
 
-type ToolId = "base64" | "diff" | "jwt" | Formatter;
+type ToolId = "base64" | "diff" | "escape" | "jwt" | Formatter;
 
-const toolIds = ["json", "yaml", "xml", "diff", "base64", "jwt"] as const satisfies readonly ToolId[];
+const toolIds = [
+  "json",
+  "yaml",
+  "xml",
+  "diff",
+  "base64",
+  "escape",
+  "jwt",
+] as const satisfies readonly ToolId[];
 
 function isToolId(value: string | null): value is ToolId {
   return toolIds.some((id) => id === value);
@@ -59,7 +69,11 @@ function isFormatter(id: ToolId): id is Formatter {
 }
 
 function isTextTool(id: ToolId): id is TextToolId {
-  return id === "base64" || isFormatter(id);
+  return id === "base64" || id === "escape" || isFormatter(id);
+}
+
+function hasTreeOutput(id: ToolId) {
+  return isFormatter(id);
 }
 
 function formatCount(value: number) {
@@ -147,6 +161,14 @@ const tools: Array<{
     inputPlaceholder: "Enter plain text or Base64...",
   },
   {
+    id: "escape",
+    label: "Escape",
+    command: "./escape.sh",
+    description:
+      "Escape or unescape text, or minify JSON to a single line.",
+    inputPlaceholder: "Hello\\nworld — or formatted JSON to minify...",
+  },
+  {
     id: "jwt",
     label: "JWT",
     command: "./jwt.sh --debug",
@@ -159,12 +181,13 @@ const tools: Array<{
 const toolGroups: Array<{ label: string; tools: ToolId[] }> = [
   { label: "Format", tools: ["json", "yaml", "xml"] },
   { label: "Compare", tools: ["diff"] },
-  { label: "Encode", tools: ["base64", "jwt"] },
+  { label: "Encode", tools: ["base64", "escape", "jwt"] },
 ];
 
 const emptyState = (): Record<ToolId, ToolState> => ({
   base64: { input: "", output: "", error: "", tree: null },
   diff: { input: "", output: "", error: "", tree: null },
+  escape: { input: "", output: "", error: "", tree: null },
   json: { input: "", output: "", error: "", tree: null },
   jwt: { input: "", output: "", error: "", tree: null },
   yaml: { input: "", output: "", error: "", tree: null },
@@ -219,7 +242,7 @@ function OutputViewer({
   outputView: OutputMode;
   fullscreen?: boolean;
 }) {
-  if (activeTool !== "base64" && outputView === "tree") {
+  if (hasTreeOutput(activeTool) && outputView === "tree") {
     if (current.tree) {
       return <TreeView root={current.tree} fullscreen={fullscreen} />;
     }
@@ -265,12 +288,12 @@ export default function DevTools() {
       setToolStates((states) => {
         const next = { ...states };
 
-        for (const id of ["json", "yaml", "xml", "base64"] as const) {
+        for (const id of ["json", "yaml", "xml", "base64", "escape"] as const) {
           const stored = readTextSpec(id);
           if (!stored) continue;
 
           let tree: TreeNode | null = null;
-          if (id !== "base64" && stored.output) {
+          if (isFormatter(id) && stored.output) {
             try {
               tree = buildFormatterTree(id, stored.output);
             } catch {
@@ -326,7 +349,9 @@ export default function DevTools() {
     }));
   };
 
-  const run = (action: "encode" | "decode" | "format") => {
+  const run = (
+    action: "encode" | "decode" | "escape" | "unescape" | "format" | "minify",
+  ) => {
     setStatus("");
 
     try {
@@ -338,6 +363,13 @@ export default function DevTools() {
           action === "encode"
             ? encodeBase64(current.input)
             : decodeBase64(current.input);
+      } else if (action === "escape" || action === "unescape") {
+        output =
+          action === "escape"
+            ? escapeText(current.input)
+            : unescapeText(current.input);
+      } else if (action === "minify") {
+        output = minifyJson(current.input);
       } else {
         const formatter = activeTool as Formatter;
         output = formatValue(formatter, current.input);
@@ -347,6 +379,9 @@ export default function DevTools() {
       updateCurrent({ output, tree, error: "" });
       if (isTextTool(activeTool)) {
         writeTextSpec(activeTool, { input: current.input, output });
+      }
+      if (action === "minify") {
+        setStatus("Minified to one line.");
       }
       window.requestAnimationFrame(() => {
         stdoutRef.current?.scrollIntoView({
@@ -498,6 +533,30 @@ export default function DevTools() {
                       decode
                     </button>
                   </>
+                ) : activeTool === "escape" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => run("escape")}
+                      className={`${headerButtonClass} border-accent bg-accent text-accent-contrast hover:brightness-110`}
+                    >
+                      escape
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => run("unescape")}
+                      className={`${headerButtonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
+                    >
+                      unescape
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => run("minify")}
+                      className={`${headerButtonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
+                    >
+                      minify
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -539,7 +598,9 @@ export default function DevTools() {
               spellCheck={false}
               className="min-h-72 w-full resize-y rounded-sm border border-border bg-background/70 p-4 text-sm leading-6 text-foreground transition placeholder:text-muted/55 hover:border-accent/40 focus:border-accent focus:outline-none"
             />
-            {isFormatter(activeTool) ? <TextStats value={current.input} /> : null}
+            {isFormatter(activeTool) || activeTool === "escape" ? (
+              <TextStats value={current.input} />
+            ) : null}
           </div>
 
           <div ref={stdoutRef} className="block scroll-mt-20">
@@ -548,7 +609,7 @@ export default function DevTools() {
                 stdout
               </span>
               <div className="flex items-center gap-2">
-                {activeTool !== "base64" ? (
+                {hasTreeOutput(activeTool) ? (
                   <OutputModeToggle
                     value={outputView}
                     onChange={setOutputView}
@@ -570,7 +631,7 @@ export default function DevTools() {
               current={current}
               outputView={outputView}
             />
-            {isFormatter(activeTool) ? (
+            {isFormatter(activeTool) || activeTool === "escape" ? (
               <TextStats value={current.output} />
             ) : null}
           </div>
@@ -601,7 +662,7 @@ export default function DevTools() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {activeTool !== "base64" ? (
+              {hasTreeOutput(activeTool) ? (
                 <OutputModeToggle
                   value={outputView}
                   onChange={setOutputView}

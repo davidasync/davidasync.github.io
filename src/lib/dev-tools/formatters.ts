@@ -28,6 +28,15 @@ export function formatJson(value: string) {
   }
 }
 
+export function minifyJson(value: string) {
+  try {
+    return JSON.stringify(JSON.parse(value));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`Invalid JSON: ${message}`);
+  }
+}
+
 export function formatJsonWithExpandedStrings(value: string) {
   try {
     return JSON.stringify(expandJsonStrings(JSON.parse(value)), null, 2);

@@ -9,9 +9,13 @@ import {
 } from "@/lib/dev-tools/diff";
 import { openNodePng } from "@/lib/dev-tools/diff-screenshot";
 import {
-  decodeSharedDiffHash,
+  downloadSharedDiff,
+  encodeRemoteShare,
   encodeSharedDiff,
+  isSharedDiffHash,
   MAX_SHARE_URL_LENGTH,
+  parseSharedDiffHash,
+  uploadSharedDiff,
 } from "@/lib/dev-tools/diff-share";
 import {
   clearToolSpec,
@@ -28,27 +32,64 @@ const buttonClass =
   "inline-flex items-center justify-center rounded-sm border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
 export default function DiffChecker() {
-  const [sharedDiff] = useState(() =>
+  const [shareRef] = useState(() =>
     typeof window === "undefined"
       ? null
-      : decodeSharedDiffHash(window.location.hash),
+      : parseSharedDiffHash(window.location.hash),
   );
-  const [original, setOriginal] = useState(sharedDiff?.original ?? "");
-  const [changed, setChanged] = useState(sharedDiff?.changed ?? "");
+  const inlineShare = shareRef?.kind === "inline" ? shareRef.diff : null;
+  const [original, setOriginal] = useState(inlineShare?.original ?? "");
+  const [changed, setChanged] = useState(inlineShare?.changed ?? "");
   const [result, setResult] = useState<DiffResult | null>(() =>
-    sharedDiff
-      ? buildSideBySideDiff(sharedDiff.original, sharedDiff.changed)
+    inlineShare
+      ? buildSideBySideDiff(inlineShare.original, inlineShare.changed)
       : null,
   );
-  const [notice, setNotice] = useState<Notice | null>(
-    sharedDiff
-      ? { kind: "success", message: "Shared comparison loaded." }
-      : null,
-  );
+  const [notice, setNotice] = useState<Notice | null>(() => {
+    if (inlineShare) {
+      return { kind: "success", message: "Shared comparison loaded." };
+    }
+    if (shareRef?.kind === "remote") {
+      return { kind: "success", message: "Loading shared comparison..." };
+    }
+    return null;
+  });
+  const [sharing, setSharing] = useState(false);
   const outputRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (sharedDiff) return;
+    if (shareRef?.kind === "remote") {
+      let cancelled = false;
+
+      void downloadSharedDiff(shareRef.id)
+        .then((diff) => {
+          if (cancelled) return;
+          setOriginal(diff.original);
+          setChanged(diff.changed);
+          setResult(buildSideBySideDiff(diff.original, diff.changed));
+          setNotice({
+            kind: "success",
+            message:
+              "Shared comparison loaded. Remote links expire after 24 hours.",
+          });
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setNotice({
+            kind: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unable to load this share link.",
+          });
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (shareRef) return;
 
     const timer = window.setTimeout(() => {
       const stored = readDiffSpec();
@@ -60,10 +101,10 @@ export default function DiffChecker() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [sharedDiff]);
+  }, [shareRef]);
 
   const clearSharedHash = () => {
-    if (window.location.hash.startsWith("#diff=")) {
+    if (isSharedDiffHash(window.location.hash)) {
       window.history.replaceState(
         null,
         "",
@@ -89,27 +130,51 @@ export default function DiffChecker() {
   };
 
   const share = async () => {
-    const encoded = encodeSharedDiff({ original, changed });
-    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#diff=${encoded}`;
+    const path = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    const inlineEncoded = encodeSharedDiff({ original, changed });
+    const inlineUrl = `${path}#diff=${inlineEncoded}`;
 
-    if (url.length > MAX_SHARE_URL_LENGTH) {
+    setSharing(true);
+    setNotice({ kind: "success", message: "Creating share link..." });
+
+    try {
+      let encoded = inlineEncoded;
+      let remote = false;
+
+      if (inlineUrl.length > MAX_SHARE_URL_LENGTH) {
+        encoded = encodeRemoteShare(await uploadSharedDiff({ original, changed }));
+        remote = true;
+      }
+
+      const url = `${path}#diff=${encoded}`;
+      window.history.replaceState(null, "", `#diff=${encoded}`);
+
+      try {
+        await navigator.clipboard.writeText(url);
+        setNotice({
+          kind: "success",
+          message: remote
+            ? "Share link copied. It is stored on dpaste.com and expires after 24 hours."
+            : "Share link copied to clipboard.",
+        });
+      } catch {
+        setNotice({
+          kind: "error",
+          message: remote
+            ? "Share link created (expires in 24 hours), but clipboard access was denied."
+            : "Share link created, but clipboard access was denied.",
+        });
+      }
+    } catch (error) {
       setNotice({
         kind: "error",
         message:
-          "This comparison is too large for a reliable share link. Try a smaller diff or open a PNG instead.",
+          error instanceof Error
+            ? error.message
+            : "Unable to create a share link.",
       });
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      window.history.replaceState(null, "", `#diff=${encoded}`);
-      setNotice({
-        kind: "success",
-        message: "Share link copied to clipboard.",
-      });
-    } catch {
-      setNotice({ kind: "error", message: "Clipboard access was denied." });
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -183,8 +248,8 @@ export default function DiffChecker() {
         </button>
         <button
           type="button"
-          onClick={share}
-          disabled={!original && !changed}
+          onClick={() => void share()}
+          disabled={sharing || (!original && !changed)}
           className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
         >
           share link
@@ -229,7 +294,8 @@ export default function DiffChecker() {
         ) : (
           <p className="text-muted">
             <span className="mr-2 text-accent">[ready]</span>
-            Comparison stays local. Share links contain both inputs, so remove
+            Comparison stays local until you share. Short links stay in the
+            URL; larger ones go to dpaste.com and expire after 24 hours. Remove
             secrets before sharing.
           </p>
         )}

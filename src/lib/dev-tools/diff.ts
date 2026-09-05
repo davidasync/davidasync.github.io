@@ -21,7 +21,8 @@ export function buildSideBySideDiff(
   original: string,
   changed: string,
 ): DiffResult {
-  const changes = diffArrays(textLines(original), textLines(changed));
+  const [left, right] = canonicalizePair(original, changed);
+  const changes = diffArrays(textLines(left), textLines(right));
   const rows: DiffRow[] = [];
   let originalLine = 1;
   let changedLine = 1;
@@ -87,8 +88,44 @@ export function buildSideBySideDiff(
     }
   }
 
-  const { additions, deletions } = countCharChanges(original, changed);
+  const { additions, deletions } = countCharChanges(left, right);
   return { rows, additions, deletions };
+}
+
+/** When both sides are JSON, sort object keys so key order is ignored. */
+function canonicalizePair(original: string, changed: string): [string, string] {
+  const left = tryCanonicalJson(original);
+  const right = tryCanonicalJson(changed);
+  if (left === null || right === null) return [original, changed];
+  return [left, right];
+}
+
+function tryCanonicalJson(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    return JSON.stringify(sortJsonKeys(JSON.parse(trimmed)), null, 2);
+  } catch {
+    return null;
+  }
+}
+
+function sortJsonKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonKeys);
+  }
+
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [key, sortJsonKeys(record[key])]),
+    );
+  }
+
+  return value;
 }
 
 function countCharChanges(original: string, changed: string) {

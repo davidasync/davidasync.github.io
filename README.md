@@ -7,7 +7,7 @@ Personal site for [davidasync](https://davidasync.github.io): a terminal-styled 
 ## What’s here
 
 - Portfolio: about, skills, work, experience, contact
-- [Developer tools](https://davidasync.github.io/dev-tools/): JSON, YAML, and XML beautifiers, text diff, Base64, and a JWT debugger
+- [Developer tools](https://davidasync.github.io/dev-tools/): JSON, YAML, and XML beautifiers, text diff, Base64, string escape/unescape, and a JWT debugger
 
 Site copy lives in `src/content/site.ts`. Colours and theme tokens live in `src/app/globals.css`.
 
