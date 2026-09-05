@@ -566,7 +566,7 @@ export default function DevTools() {
               spellCheck={false}
               className="min-h-72 w-full resize-y rounded-sm border border-border bg-background/70 p-4 text-sm leading-6 text-foreground transition placeholder:text-muted/55 hover:border-accent/40 focus:border-accent focus:outline-none"
             />
-            {isFormatter(activeTool) || activeTool === "escape" ? (
+            {isTextTool(activeTool) ? (
               <TextStats value={current.input} />
             ) : null}
           </div>
@@ -599,7 +599,7 @@ export default function DevTools() {
               current={current}
               outputView={outputView}
             />
-            {isFormatter(activeTool) || activeTool === "escape" ? (
+            {isTextTool(activeTool) ? (
               <TextStats value={current.output} />
             ) : null}
           </div>
