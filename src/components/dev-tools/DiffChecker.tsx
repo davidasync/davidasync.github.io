@@ -6,6 +6,7 @@ import {
   buildSideBySideDiff,
   type DiffCell,
   type DiffResult,
+  type DiffRow,
 } from "@/lib/dev-tools/diff";
 import { openNodePng } from "@/lib/dev-tools/diff-screenshot";
 import {
@@ -23,6 +24,7 @@ import {
   readDiffSpec,
   writeDiffSpec,
 } from "@/lib/dev-tools/storage";
+import TextStats, { formatCount } from "./TextStats";
 
 type Notice = {
   kind: "success" | "error";
@@ -211,9 +213,8 @@ export default function DiffChecker() {
     <div>
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="block">
-          <span className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted">
-            <span>original text</span>
-            <span>{lineCount(original)} lines</span>
+          <span className="mb-2 block text-[11px] uppercase tracking-[0.16em] text-muted">
+            original text
           </span>
           <textarea
             value={original}
@@ -222,12 +223,12 @@ export default function DiffChecker() {
             spellCheck={false}
             className="min-h-72 w-full resize-y rounded-sm border border-border bg-background/70 p-4 text-sm leading-6 text-foreground transition placeholder:text-muted/55 hover:border-terminal-red/50 focus:border-terminal-red focus:outline-none"
           />
+          <TextStats value={original} />
         </label>
 
         <label className="block">
-          <span className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted">
-            <span>changed text</span>
-            <span>{lineCount(changed)} lines</span>
+          <span className="mb-2 block text-[11px] uppercase tracking-[0.16em] text-muted">
+            changed text
           </span>
           <textarea
             value={changed}
@@ -236,6 +237,7 @@ export default function DiffChecker() {
             spellCheck={false}
             className="min-h-72 w-full resize-y rounded-sm border border-border bg-background/70 p-4 text-sm leading-6 text-foreground transition placeholder:text-muted/55 hover:border-accent/50 focus:border-accent focus:outline-none"
           />
+          <TextStats value={changed} />
         </label>
       </div>
 
@@ -337,11 +339,15 @@ function DiffOutput({
       </div>
 
       {identical ? (
-        <div className="rounded-sm border border-accent/40 bg-accent-soft px-4 py-8 text-center text-sm text-accent">
+        <div
+          data-diff-capture
+          className="rounded-sm border border-accent/40 bg-accent-soft px-4 py-8 text-center text-sm text-accent"
+        >
           [identical] No differences found.
         </div>
       ) : (
         <div
+          data-diff-capture
           data-diff-scroll
           className="max-h-[42rem] overflow-auto rounded-sm border border-border bg-background/60"
         >
@@ -354,6 +360,7 @@ function DiffOutput({
             {result.rows.map((row, index) => (
               <div
                 key={`${row.left?.line ?? "x"}-${row.right?.line ?? "x"}-${index}`}
+                data-diff-row={isChangedRow(row) ? "changed" : "same"}
                 className="grid grid-cols-2 border-b border-border/50 last:border-0"
               >
                 <DiffCellView
@@ -426,6 +433,10 @@ function DiffCellView({
   );
 }
 
+function isChangedRow(row: DiffRow) {
+  return row.left?.kind !== "same" || row.right?.kind !== "same";
+}
+
 function WordDiff({
   original,
   changed,
@@ -453,10 +464,3 @@ function WordDiff({
     ));
 }
 
-function lineCount(value: string) {
-  return value === "" ? 0 : value.split("\n").length;
-}
-
-function formatCount(value: number) {
-  return new Intl.NumberFormat("en").format(value);
-}

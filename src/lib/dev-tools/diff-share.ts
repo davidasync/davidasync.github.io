@@ -70,7 +70,7 @@ export async function uploadSharedDiff(diff: SharedDiff) {
     content,
     expiry_days: String(REMOTE_SHARE_TTL_DAYS),
     syntax: "json",
-    title: "davidasync-diff",
+    title: crypto.randomUUID(),
   });
 
   const response = await fetch(DPASTE_CREATE_URL, {
