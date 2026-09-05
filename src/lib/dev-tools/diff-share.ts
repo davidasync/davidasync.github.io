@@ -4,7 +4,7 @@ export const MAX_SHARE_URL_LENGTH = 2_000;
 const MAX_INLINE_HASH_LENGTH = 100_000;
 export const SHARE_HASH_PREFIX = "#diff=";
 export const REMOTE_SHARE_PREFIX = "remote:";
-export const REMOTE_SHARE_TTL_HOURS = 24;
+export const REMOTE_SHARE_TTL_DAYS = 7;
 
 const DPASTE_CREATE_URL = "https://dpaste.com/api/v2/";
 const MAX_REMOTE_CONTENT_CHARS = 750_000;
@@ -68,7 +68,7 @@ export async function uploadSharedDiff(diff: SharedDiff) {
 
   const body = new URLSearchParams({
     content,
-    expiry_days: "1",
+    expiry_days: String(REMOTE_SHARE_TTL_DAYS),
     syntax: "json",
     title: "davidasync-diff",
   });
@@ -124,7 +124,7 @@ async function fetchSharedDiff(id: string) {
 
   if (response.status === 404) {
     throw new Error(
-      "This share link is missing or expired (remote links last 24 hours).",
+      `This share link is missing or expired (remote links last ${REMOTE_SHARE_TTL_DAYS} days).`,
     );
   }
 
