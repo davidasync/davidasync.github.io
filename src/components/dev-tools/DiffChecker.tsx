@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+} from "react";
 import { diffWordsWithSpace } from "diff";
 import {
   buildSideBySideDiff,
@@ -8,7 +14,11 @@ import {
   type DiffResult,
   type DiffRow,
 } from "@/lib/dev-tools/diff";
-import { openNodePng } from "@/lib/dev-tools/diff-screenshot";
+import {
+  DiffTooLargeError,
+  openNodePng,
+  prewarmPngCapture,
+} from "@/lib/dev-tools/diff-screenshot";
 import {
   downloadSharedDiff,
   encodeRemoteShare,
@@ -58,6 +68,13 @@ export default function DiffChecker() {
     return null;
   });
   const [sharing, setSharing] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+
+  // Inlining the web fonts is the slowest part of a capture and never
+  // changes, so resolve it while the user is still reading the diff.
+  useEffect(() => {
+    if (result) prewarmPngCapture();
+  }, [result]);
   const outputRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -194,18 +211,31 @@ export default function DiffChecker() {
       return;
     }
 
+    tab.document.write(
+      "<title>Rendering diff...</title>" +
+        "<body style=\"margin:0;display:grid;place-items:center;height:100vh;" +
+        "background:#0c0a0d;color:#8a8590;font:14px ui-monospace,monospace\">" +
+        "[rendering] Building the comparison image...</body>",
+    );
+    tab.document.close();
+
+    setCapturing(true);
     try {
       await openNodePng(node, tab);
       setNotice({
         kind: "success",
         message: "Difference image opened in a new tab.",
       });
-    } catch {
+    } catch (error) {
       setNotice({
         kind: "error",
         message:
-          "Unable to capture this comparison. Try a smaller diff.",
+          error instanceof DiffTooLargeError
+            ? "Too many changed lines to fit in one image. Compare a smaller section."
+            : "Unable to capture this comparison. Try a smaller diff.",
       });
+    } finally {
+      setCapturing(false);
     }
   };
 
@@ -260,10 +290,10 @@ export default function DiffChecker() {
         <button
           type="button"
           onClick={() => void screenshot()}
-          disabled={!result}
+          disabled={!result || capturing}
           className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
         >
-          open png
+          {capturing ? "rendering png..." : "open png"}
         </button>
         <button
           type="button"
@@ -317,6 +347,7 @@ function DiffOutput({
   outputRef: RefObject<HTMLElement | null>;
 }) {
   const identical = result.additions === 0 && result.deletions === 0;
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
     <section
@@ -346,36 +377,41 @@ function DiffOutput({
           [identical] No differences found.
         </div>
       ) : (
-        <div
-          data-diff-capture
-          data-diff-scroll
-          className="max-h-[42rem] overflow-auto rounded-sm border border-border bg-background/60"
-        >
-          <div className="min-w-[720px]">
-            <div className="sticky top-0 z-10 grid grid-cols-2 border-b border-border bg-surface-2 text-[10px] uppercase tracking-[0.14em] text-muted">
-              <div className="border-r border-border px-3 py-2">original</div>
-              <div className="px-3 py-2">changed</div>
-            </div>
-
-            {result.rows.map((row, index) => (
-              <div
-                key={`${row.left?.line ?? "x"}-${row.right?.line ?? "x"}-${index}`}
-                data-diff-row={isChangedRow(row) ? "changed" : "same"}
-                className="grid grid-cols-2 border-b border-border/50 last:border-0"
-              >
-                <DiffCellView
-                  cell={row.left}
-                  otherText={row.right?.text}
-                  side="left"
-                />
-                <DiffCellView
-                  cell={row.right}
-                  otherText={row.left?.text}
-                  side="right"
-                />
+        <div className="flex overflow-hidden rounded-sm border border-border">
+          <div
+            ref={scrollRef}
+            data-diff-capture
+            data-diff-scroll
+            className="max-h-[42rem] min-w-0 flex-1 overflow-auto bg-background/60"
+          >
+            <div className="min-w-[720px]">
+              <div className="sticky top-0 z-10 grid grid-cols-2 border-b border-border bg-surface-2 text-[10px] uppercase tracking-[0.14em] text-muted">
+                <div className="border-r border-border px-3 py-2">original</div>
+                <div className="px-3 py-2">changed</div>
               </div>
-            ))}
+
+              {result.rows.map((row, index) => (
+                <div
+                  key={`${row.left?.line ?? "x"}-${row.right?.line ?? "x"}-${index}`}
+                  data-diff-row={isChangedRow(row) ? "changed" : "same"}
+                  className="grid grid-cols-2 border-b border-border/50 last:border-0"
+                >
+                  <DiffCellView
+                    cell={row.left}
+                    otherText={row.right?.text}
+                    side="left"
+                  />
+                  <DiffCellView
+                    cell={row.right}
+                    otherText={row.left?.text}
+                    side="right"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
+
+          <DiffMinimap scrollRef={scrollRef} rows={result.rows} />
         </div>
       )}
     </section>
@@ -429,6 +465,172 @@ function DiffCellView({
           cell.text || " "
         )}
       </code>
+    </div>
+  );
+}
+
+type Marker = {
+  /** Fraction of the scrollable content, 0-1. */
+  start: number;
+  end: number;
+  /** Which pane the row touches, mirroring the two columns of the diff. */
+  original: boolean;
+  changed: boolean;
+};
+
+/**
+ * The strip is split down the middle like the diff itself, so a tick sits under
+ * the pane it belongs to. A third colour is not an option here: several themes
+ * set --accent and --terminal-yellow to near-identical ambers.
+ */
+function markedSides(row: DiffRow) {
+  // A missing cell is filler opposite an insertion or deletion, so the change
+  // belongs to the other pane only.
+  return {
+    original: row.left != null && row.left.kind !== "same",
+    changed: row.right != null && row.right.kind !== "same",
+  };
+}
+
+/**
+ * An overview strip beside the diff, one tick per changed line, so a long
+ * comparison shows where its changes sit without scrolling through it.
+ */
+function DiffMinimap({
+  scrollRef,
+  rows,
+}: {
+  scrollRef: RefObject<HTMLDivElement | null>;
+  rows: DiffRow[];
+}) {
+  const [markers, setMarkers] = useState<Marker[]>([]);
+  const [viewport, setViewport] = useState<{ start: number; end: number } | null>(
+    null,
+  );
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+
+    // Scrolling moves the viewport band but never the ticks, so the two are
+    // tracked apart: re-measuring every row on each scroll event would rebuild
+    // hundreds of nodes a frame.
+    const trackViewport = () => {
+      const total = scroll.scrollHeight;
+      if (total <= 0) return;
+
+      setViewport(
+        scroll.clientHeight >= total
+          ? null
+          : {
+              start: scroll.scrollTop / total,
+              end: (scroll.scrollTop + scroll.clientHeight) / total,
+            },
+      );
+    };
+
+    const measure = () => {
+      const total = scroll.scrollHeight;
+      if (total <= 0) return;
+
+      const base = scroll.getBoundingClientRect().top - scroll.scrollTop;
+      const found: Marker[] = [];
+
+      scroll
+        .querySelectorAll<HTMLElement>("[data-diff-row]")
+        .forEach((element, index) => {
+          const row = rows[index];
+          if (!row) return;
+
+          const sides = markedSides(row);
+          if (!sides.original && !sides.changed) return;
+
+          const box = element.getBoundingClientRect();
+          found.push({
+            start: (box.top - base) / total,
+            end: (box.bottom - base) / total,
+            ...sides,
+          });
+        });
+
+      setMarkers(found);
+      trackViewport();
+    };
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroll);
+    const content = scroll.firstElementChild;
+    if (content) observer.observe(content);
+
+    scroll.addEventListener("scroll", trackViewport, { passive: true });
+    return () => {
+      observer.disconnect();
+      scroll.removeEventListener("scroll", trackViewport);
+    };
+  }, [rows, scrollRef]);
+
+  const jumpTo = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const scroll = scrollRef.current;
+    const track = trackRef.current;
+    if (!scroll || !track) return;
+
+    const box = track.getBoundingClientRect();
+    const fraction = (event.clientY - box.top) / box.height;
+
+    scroll.scrollTo({
+      top: fraction * scroll.scrollHeight - scroll.clientHeight / 2,
+      behavior: "smooth",
+    });
+  };
+
+  if (markers.length === 0) return null;
+
+  return (
+    <div
+      ref={trackRef}
+      onClick={jumpTo}
+      title={`${markers.length} changed ${
+        markers.length === 1 ? "line" : "lines"
+      } — click to jump`}
+      className="relative w-3 shrink-0 cursor-pointer border-l border-border bg-surface-2/50"
+    >
+      {viewport ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 rounded-[1px] border-y border-muted/40 bg-foreground/10"
+          style={{
+            top: `${viewport.start * 100}%`,
+            height: `${Math.max((viewport.end - viewport.start) * 100, 1)}%`,
+          }}
+        />
+      ) : null}
+
+      {markers.map((marker, index) => {
+        const position = {
+          top: `${marker.start * 100}%`,
+          height: `max(2px, ${(marker.end - marker.start) * 100}%)`,
+        };
+
+        return (
+          <div key={index} aria-hidden="true">
+            {marker.original ? (
+              <div
+                className="absolute left-[1px] w-[4px] rounded-[1px] bg-terminal-red"
+                style={position}
+              />
+            ) : null}
+            {marker.changed ? (
+              <div
+                className="absolute right-[1px] w-[4px] rounded-[1px] bg-accent"
+                style={position}
+              />
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }

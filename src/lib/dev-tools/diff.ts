@@ -88,7 +88,7 @@ export function buildSideBySideDiff(
     }
   }
 
-  const { additions, deletions } = countCharChanges(left, right);
+  const { additions, deletions } = countCharChanges(rows);
   return { rows, additions, deletions };
 }
 
@@ -128,17 +128,60 @@ function sortJsonKeys(value: unknown): unknown {
   return value;
 }
 
-function countCharChanges(original: string, changed: string) {
+/**
+ * Character diffing is O(n * d), so running it across two whole documents costs
+ * seconds once they are a few tens of kilobytes apart — and the result is only
+ * ever the two totals in the header. Counting per changed row instead keeps the
+ * work proportional to what actually differs.
+ */
+function countCharChanges(rows: DiffRow[]) {
   let additions = 0;
   let deletions = 0;
 
-  for (const part of diffChars(original, changed)) {
-    if (part.added) additions += part.value.length;
-    if (part.removed) deletions += part.value.length;
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const removedText =
+      row.left != null && row.left.kind !== "same" ? row.left.text : null;
+    const addedText =
+      row.right != null && row.right.kind !== "same" ? row.right.text : null;
+
+    if (removedText === null && addedText === null) continue;
+
+    // A line on one side only is wholly added or removed. It carries a newline
+    // with it unless it is the final line, which has none.
+    const newline = index === rows.length - 1 ? 0 : 1;
+
+    if (removedText === null) {
+      additions += addedText!.length + newline;
+      continue;
+    }
+    if (addedText === null) {
+      deletions += removedText.length + newline;
+      continue;
+    }
+
+    const parts = diffChars(removedText, addedText, {
+      maxEditLength: MAX_LINE_EDIT_LENGTH,
+    });
+
+    // Two lines too dissimilar to align within the budget: a full rewrite.
+    if (!parts) {
+      deletions += removedText.length;
+      additions += addedText.length;
+      continue;
+    }
+
+    for (const part of parts) {
+      if (part.added) additions += part.value.length;
+      if (part.removed) deletions += part.value.length;
+    }
   }
 
   return { additions, deletions };
 }
+
+/** Caps the per-line character diff so one pathological pair cannot stall. */
+const MAX_LINE_EDIT_LENGTH = 1000;
 
 function textLines(value: string) {
   return value === "" ? [] : value.split(/\r\n|\n|\r/);
