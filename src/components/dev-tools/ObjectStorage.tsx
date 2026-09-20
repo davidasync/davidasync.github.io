@@ -10,6 +10,7 @@ import {
   formatTtl,
   normalizeFilename,
   putObject,
+  viewableUrl,
 } from "@/lib/dev-tools/object-storage";
 import { formatExpiry } from "@/lib/dev-tools/shortener";
 import {
@@ -328,7 +329,8 @@ export default function ObjectStorage() {
               className={fieldClass}
             />
             <p className="mt-2 text-[10px] tracking-[0.06em] text-muted">
-              Names the download. Objects are always served as an attachment.
+              Names the download. Text and images open in a tab; everything
+              else downloads.
             </p>
           </div>
 
@@ -365,7 +367,7 @@ export default function ObjectStorage() {
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <a
-              href={latest.url}
+              href={viewableUrl(latest.url, latest.contentType)}
               target="_blank"
               rel="noreferrer noopener"
               className="break-all text-sm text-accent underline decoration-dotted underline-offset-4 hover:brightness-110"
@@ -412,7 +414,7 @@ export default function ObjectStorage() {
               >
                 <div className="min-w-0">
                   <a
-                    href={object.url}
+                    href={viewableUrl(object.url, object.contentType)}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="block truncate text-xs text-accent underline decoration-dotted underline-offset-4 hover:brightness-110"

@@ -62,6 +62,37 @@ export function objectUrl(id: string) {
   return `${OBJECT_STORAGE_BASE_URL}/${id}`;
 }
 
+/**
+ * `INLINE_SAFE` in the service: the types a browser may render without being
+ * able to run script, and so the only ones `?disposition=inline` is honoured
+ * for. Mirrored rather than assumed — asking for inline on anything else is
+ * silently overruled back to an attachment, which would turn a link into a
+ * blank tab that downloads.
+ */
+const INLINE_SAFE = new Set([
+  "text/plain",
+  "application/json",
+  "text/csv",
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+]);
+
+/** `text/plain; charset=utf-8` -> `text/plain`. */
+function essence(contentType: string) {
+  return (contentType.split(";")[0] ?? "").trim().toLowerCase();
+}
+
+/**
+ * The URL to put behind a link. Everything is stored as an attachment by
+ * default, so a plain link downloads; for the types above, asking for inline
+ * opens the object in the tab instead. The bare URL stays the one to copy.
+ */
+export function viewableUrl(url: string, contentType: string) {
+  return INLINE_SAFE.has(essence(contentType)) ? `${url}?disposition=inline` : url;
+}
+
 export function isObjectId(id: string) {
   return OBJECT_ID_PATTERN.test(id);
 }
