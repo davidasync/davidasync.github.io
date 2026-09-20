@@ -1,14 +1,25 @@
 import LZString from "lz-string";
+import {
+  MAX_OBJECT_BYTES,
+  MAX_TTL_SECONDS,
+  OBJECT_STORAGE_BASE_URL,
+  formatBytes,
+  getObject,
+  isObjectId,
+  putObject,
+} from "./object-storage";
 
 export const MAX_SHARE_URL_LENGTH = 2_000;
 const MAX_INLINE_HASH_LENGTH = 100_000;
 export const SHARE_HASH_PREFIX = "#diff=";
 export const REMOTE_SHARE_PREFIX = "remote:";
-export const REMOTE_SHARE_TTL_DAYS = 7;
+export const REMOTE_SHARE_TTL_DAYS = MAX_TTL_SECONDS / (24 * 60 * 60);
 
-const DPASTE_CREATE_URL = "https://dpaste.com/api/v2/";
-const MAX_REMOTE_CONTENT_CHARS = 750_000;
-const REMOTE_ID_PATTERN = /^[A-Za-z0-9]{6,16}$/;
+/** The host only — the scheme is noise in a status line. */
+export const REMOTE_SHARE_HOST = OBJECT_STORAGE_BASE_URL.replace(
+  /^https?:\/\//,
+  "",
+);
 
 export type SharedDiff = {
   original: string;
@@ -37,7 +48,7 @@ export function parseSharedDiffHash(hash: string): SharedDiffRef | null {
 
   if (encoded.startsWith(REMOTE_SHARE_PREFIX)) {
     const id = encoded.slice(REMOTE_SHARE_PREFIX.length);
-    return isRemoteShareId(id) ? { kind: "remote", id } : null;
+    return isObjectId(id) ? { kind: "remote", id } : null;
   }
 
   if (encoded.length > MAX_INLINE_HASH_LENGTH) return null;
@@ -58,46 +69,30 @@ export function isSharedDiffHash(hash: string) {
 }
 
 export async function uploadSharedDiff(diff: SharedDiff) {
-  const content = JSON.stringify(sharedPayload(diff));
+  // Weighed in bytes rather than characters, because the store's cap is a byte
+  // cap and a comparison full of multi-byte text is where the two diverge.
+  const content = new TextEncoder().encode(
+    JSON.stringify(sharedPayload(diff)),
+  );
 
-  if (content.length > MAX_REMOTE_CONTENT_CHARS) {
+  if (content.byteLength > MAX_OBJECT_BYTES) {
     throw new Error(
-      "This comparison is too large to share as a link. Open a PNG instead.",
+      `This comparison is larger than the ${formatBytes(MAX_OBJECT_BYTES)} share limit. Open a PNG instead.`,
     );
   }
 
-  const body = new URLSearchParams({
-    content,
-    expiry_days: String(REMOTE_SHARE_TTL_DAYS),
-    syntax: "json",
-    title: crypto.randomUUID(),
+  const stored = await putObject({
+    body: content,
+    contentType: "application/json",
+    filename: "diff.json",
+    ttlSeconds: MAX_TTL_SECONDS,
   });
 
-  const response = await fetch(DPASTE_CREATE_URL, {
-    method: "POST",
-    headers: {
-      Accept: "text/plain",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      "Unable to create a share link right now. Try again or open a PNG instead.",
-    );
-  }
-
-  const location = (response.headers.get("Location") ?? (await response.text()))
-    .trim()
-    .replace(/\/$/, "");
-  const id = location.split("/").pop()?.replace(/\.txt$/i, "") ?? "";
-
-  if (!isRemoteShareId(id)) {
+  if (!isObjectId(stored.id)) {
     throw new Error("Share service returned an unexpected response.");
   }
 
-  return id;
+  return stored.id;
 }
 
 const remoteDownloads = new Map<string, Promise<SharedDiff>>();
@@ -116,11 +111,11 @@ export function downloadSharedDiff(id: string) {
 }
 
 async function fetchSharedDiff(id: string) {
-  if (!isRemoteShareId(id)) {
+  if (!isObjectId(id)) {
     throw new Error("This share link is invalid.");
   }
 
-  const response = await fetchRemoteText(id);
+  const response = await getObject(id);
 
   if (response.status === 404) {
     throw new Error(
@@ -140,27 +135,8 @@ async function fetchSharedDiff(id: string) {
   return diff;
 }
 
-async function fetchRemoteText(id: string) {
-  const request = () =>
-    fetch(`https://dpaste.com/${id}.txt`, {
-      headers: { Accept: "text/plain" },
-    });
-
-  const first = await request();
-  if (first.status !== 429) return first;
-
-  await new Promise((resolve) => {
-    setTimeout(resolve, 1100);
-  });
-  return request();
-}
-
 function sharedPayload({ original, changed }: SharedDiff) {
   return { version: 1, original, changed };
-}
-
-function isRemoteShareId(id: string) {
-  return REMOTE_ID_PATTERN.test(id);
 }
 
 function parseSharedPayload(value: string): SharedDiff | null {

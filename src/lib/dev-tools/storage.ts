@@ -1,7 +1,7 @@
 export const DEV_TOOLS_STORAGE_VERSION = 1;
 
 export type TextToolId = "base64" | "escape" | "json" | "xml" | "yaml";
-export type StoredToolId = TextToolId | "diff" | "jwt" | "shorten";
+export type StoredToolId = TextToolId | "diff" | "jwt" | "objects" | "shorten";
 
 export type StoredTextSpec = {
   v: typeof DEV_TOOLS_STORAGE_VERSION;
@@ -41,6 +41,26 @@ export type StoredShortenSpec = {
   ttlSeconds: number;
   /** Newest first, capped at MAX_STORED_LINKS. */
   links: StoredShortLink[];
+};
+
+export type StoredUploadedObject = {
+  id: string;
+  url: string;
+  /** The name it was uploaded under, or "" when the bytes were pasted unnamed. */
+  filename: string;
+  contentType: string;
+  size: number;
+  expireAt: string;
+  createdAt: string;
+};
+
+export type StoredObjectsSpec = {
+  v: typeof DEV_TOOLS_STORAGE_VERSION;
+  text: string;
+  filename: string;
+  ttlSeconds: number;
+  /** Newest first, capped at MAX_STORED_LINKS. */
+  objects: StoredUploadedObject[];
 };
 
 /** Enough to find a link made earlier today without letting the entry grow unbounded. */
@@ -84,6 +104,18 @@ export function writeShortenSpec(spec: Omit<StoredShortenSpec, "v">) {
     v: DEV_TOOLS_STORAGE_VERSION,
     ...spec,
     links: spec.links.slice(0, MAX_STORED_LINKS),
+  });
+}
+
+export function readObjectsSpec() {
+  return readSpec("objects", isObjectsSpec);
+}
+
+export function writeObjectsSpec(spec: Omit<StoredObjectsSpec, "v">) {
+  writeSpec("objects", {
+    v: DEV_TOOLS_STORAGE_VERSION,
+    ...spec,
+    objects: spec.objects.slice(0, MAX_STORED_LINKS),
   });
 }
 
@@ -156,6 +188,38 @@ function isShortenSpec(value: unknown): value is StoredShortenSpec {
     typeof value.ttlSeconds === "number" &&
     Array.isArray(value.links) &&
     value.links.every(isShortLink)
+  );
+}
+
+function isObjectsSpec(value: unknown): value is StoredObjectsSpec {
+  return (
+    isVersioned(value) &&
+    typeof value.text === "string" &&
+    typeof value.filename === "string" &&
+    typeof value.ttlSeconds === "number" &&
+    Array.isArray(value.objects) &&
+    value.objects.every(isUploadedObject)
+  );
+}
+
+function isUploadedObject(value: unknown): value is StoredUploadedObject {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "url" in value &&
+    typeof value.url === "string" &&
+    "filename" in value &&
+    typeof value.filename === "string" &&
+    "contentType" in value &&
+    typeof value.contentType === "string" &&
+    "size" in value &&
+    typeof value.size === "number" &&
+    "expireAt" in value &&
+    typeof value.expireAt === "string" &&
+    "createdAt" in value &&
+    typeof value.createdAt === "string"
   );
 }
 

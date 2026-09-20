@@ -26,6 +26,7 @@ import {
   isSharedDiffHash,
   MAX_SHARE_URL_LENGTH,
   parseSharedDiffHash,
+  REMOTE_SHARE_HOST,
   REMOTE_SHARE_TTL_DAYS,
   uploadSharedDiff,
 } from "@/lib/dev-tools/diff-share";
@@ -174,7 +175,7 @@ export default function DiffChecker() {
         setNotice({
           kind: "success",
           message: remote
-            ? `Share link copied. It is stored on dpaste.com and expires after ${REMOTE_SHARE_TTL_DAYS} days.`
+            ? `Share link copied. It is stored on ${REMOTE_SHARE_HOST} and expires after ${REMOTE_SHARE_TTL_DAYS} days.`
             : "Share link copied to clipboard.",
         });
       } catch {
@@ -328,7 +329,7 @@ export default function DiffChecker() {
           <p className="text-muted">
             <span className="mr-2 text-accent">[ready]</span>
             Comparison stays local until you share. Short links stay in the
-            URL; larger ones go to dpaste.com and expire after{" "}
+            URL; larger ones go to {REMOTE_SHARE_HOST} and expire after{" "}
             {REMOTE_SHARE_TTL_DAYS} days. Remove secrets before sharing.
           </p>
         )}

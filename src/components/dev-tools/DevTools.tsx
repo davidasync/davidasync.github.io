@@ -20,11 +20,19 @@ import {
 } from "@/lib/dev-tools/storage";
 import DiffChecker from "./DiffChecker";
 import JwtTool from "./JwtTool";
+import ObjectStorage from "./ObjectStorage";
 import TextStats from "./TextStats";
 import TreeView from "./TreeView";
 import UrlShortener from "./UrlShortener";
 
-type ToolId = "base64" | "diff" | "escape" | "jwt" | "shorten" | Formatter;
+type ToolId =
+  | "base64"
+  | "diff"
+  | "escape"
+  | "jwt"
+  | "objects"
+  | "shorten"
+  | Formatter;
 
 const toolIds = [
   "json",
@@ -35,6 +43,7 @@ const toolIds = [
   "escape",
   "jwt",
   "shorten",
+  "objects",
 ] as const satisfies readonly ToolId[];
 
 function isToolId(value: string | null): value is ToolId {
@@ -154,13 +163,21 @@ const tools: Array<{
       "Turn a long URL into a short link with an optional custom code and expiry.",
     inputPlaceholder: "https://example.com/a/very/long/path",
   },
+  {
+    id: "objects",
+    label: "Objects",
+    command: "./store.sh --object",
+    description:
+      "Upload a file or some text and get back a link that expires on its own.",
+    inputPlaceholder: "Drop a file, or paste the text to store...",
+  },
 ];
 
 const toolGroups: Array<{ label: string; tools: ToolId[] }> = [
   { label: "Format", tools: ["json", "yaml", "xml"] },
   { label: "Compare", tools: ["diff"] },
   { label: "Encode", tools: ["base64", "escape", "jwt"] },
-  { label: "Share", tools: ["shorten"] },
+  { label: "Share", tools: ["shorten", "objects"] },
 ];
 
 const emptyState = (): Record<ToolId, ToolState> => ({
@@ -169,6 +186,7 @@ const emptyState = (): Record<ToolId, ToolState> => ({
   escape: { input: "", output: "", error: "", tree: null },
   json: { input: "", output: "", error: "", tree: null },
   jwt: { input: "", output: "", error: "", tree: null },
+  objects: { input: "", output: "", error: "", tree: null },
   shorten: { input: "", output: "", error: "", tree: null },
   yaml: { input: "", output: "", error: "", tree: null },
   xml: { input: "", output: "", error: "", tree: null },
@@ -470,6 +488,8 @@ export default function DevTools() {
           <JwtTool />
         ) : activeTool === "shorten" ? (
           <UrlShortener />
+        ) : activeTool === "objects" ? (
+          <ObjectStorage />
         ) : (
           <>
         <div className="mb-4 min-h-6 text-xs" aria-live="polite">
