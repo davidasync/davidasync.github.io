@@ -272,7 +272,7 @@ export default function UrlShortener() {
       {latest ? (
         <div
           ref={latestRef}
-          className="mt-6 scroll-mt-20 rounded-sm border border-accent/50 bg-accent-soft/50 p-4"
+          className="mt-6 scroll-mt-28 rounded-sm border border-accent/50 bg-accent-soft/50 p-4"
         >
           <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
             newest link

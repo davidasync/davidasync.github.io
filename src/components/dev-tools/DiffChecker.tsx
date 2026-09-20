@@ -439,7 +439,7 @@ function DiffOutput({
   return (
     <section
       ref={outputRef}
-      className="mt-6 scroll-mt-20"
+      className="mt-6 scroll-mt-28"
       aria-label="Text comparison result"
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">

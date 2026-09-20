@@ -197,8 +197,11 @@ const emptyState = (): Record<ToolId, ToolState> => ({
   xml: { input: "", output: "", error: "", tree: null },
 });
 
+/** The site header is `fixed` and this tall, so the strip rests just below it. */
+const NAV_HEIGHT = 56;
+
 const buttonClass =
-  "inline-flex items-center justify-center rounded-sm border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center rounded-sm border text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
 const headerButtonClass =
   "inline-flex items-center justify-center rounded-sm border px-2 py-1 text-[10px] uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50";
@@ -278,6 +281,8 @@ function OutputViewer({
 export default function DevTools() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const stdoutRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [pinned, setPinned] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolId>("json");
   const [toolStates, setToolStates] = useState(emptyState);
   const [outputView, setOutputView] = useState<OutputMode>("tree");
@@ -333,6 +338,28 @@ export default function DevTools() {
       window.removeEventListener("hashchange", syncFromUrl);
       window.removeEventListener("popstate", syncFromUrl);
     };
+  }, []);
+
+  /**
+   * Whether the tab strip has come to rest under the site header. Watched with
+   * a sentinel above the strip rather than a scroll position, because the strip
+   * moves with the page — how far down it sits depends on the viewport.
+   *
+   * It only drives how tall the strip is: pinned, the group labels come off, so
+   * the two rows of permanent chrome stay near the height of one.
+   */
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setPinned(!entry.isIntersecting),
+      // NAV_HEIGHT of fixed header to clear before anything below it is hidden.
+      { rootMargin: `-${NAV_HEIGHT}px 0px 0px 0px`, threshold: 0 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -441,8 +468,18 @@ export default function DevTools() {
       title={`${tool.command} — dev-tools`}
       contentClassName="p-4 sm:p-6"
     >
+      {/* Watched, not shown. The strip is pinned from the moment this passes
+          behind the header. */}
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+
       <div
-        className="flex items-end gap-4 overflow-x-auto border-b border-dashed border-border pb-4"
+        /* Full-bleed via negative margins so the background reaches the card
+           edges — the content scrolling underneath has to be covered, and the
+           card's own translucency would otherwise show it through. Below the
+           header's z-50, above the panel. */
+        className={`sticky top-14 z-30 -mx-4 flex items-end gap-4 overflow-x-auto border-b border-dashed border-border bg-surface px-4 sm:-mx-6 sm:px-6 ${
+          pinned ? "py-2" : "pb-4"
+        }`}
         role="tablist"
         aria-label="Developer tools"
       >
@@ -454,9 +491,13 @@ export default function DevTools() {
               groupIndex > 0 ? "border-l border-border/70 pl-4" : ""
             }`}
           >
-            <p className="mb-1.5 text-[9px] uppercase tracking-[0.16em] text-muted">
-              {group.label}
-            </p>
+            {/* Orientation for a first visit, not something read on the tenth
+                scroll — dropped once pinned to keep the strip near one row. */}
+            {pinned ? null : (
+              <p className="mb-1.5 text-[9px] uppercase tracking-[0.16em] text-muted">
+                {group.label}
+              </p>
+            )}
             <div className="flex gap-2" role="presentation">
               {group.tools.map((toolId) => {
                 const item = tools.find(({ id }) => id === toolId);
@@ -470,7 +511,9 @@ export default function DevTools() {
                     aria-selected={activeTool === item.id}
                     aria-controls="tool-panel"
                     onClick={() => selectTool(item.id)}
-                    className={`${buttonClass} shrink-0 ${
+                    className={`${buttonClass} shrink-0 px-3 ${
+                      pinned ? "py-1" : "py-2"
+                    } ${
                       activeTool === item.id
                         ? "border-accent bg-accent-soft text-accent"
                         : "border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-foreground"
@@ -625,7 +668,7 @@ export default function DevTools() {
             ) : null}
           </div>
 
-          <div ref={stdoutRef} className="block scroll-mt-20">
+          <div ref={stdoutRef} className="block scroll-mt-28">
             <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
               <span className="text-[11px] uppercase tracking-[0.16em] text-muted">
                 stdout
@@ -699,14 +742,14 @@ export default function DevTools() {
                     ? "Parse nested JSON strings into objects and arrays before copying"
                     : undefined
                 }
-                className={`${buttonClass} border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
+                className={`${buttonClass} px-3 py-2 border-border bg-surface-2 text-muted hover:border-accent/60 hover:text-accent`}
               >
                 copy value
               </button>
               <button
                 type="button"
                 onClick={() => setFullscreen(false)}
-                className={`${buttonClass} border-accent/60 bg-accent-soft text-accent hover:border-accent`}
+                className={`${buttonClass} px-3 py-2 border-accent/60 bg-accent-soft text-accent hover:border-accent`}
               >
                 close
               </button>

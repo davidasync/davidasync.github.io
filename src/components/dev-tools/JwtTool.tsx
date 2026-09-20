@@ -287,7 +287,7 @@ export default function JwtTool() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div ref={tokenRef} className="block scroll-mt-20">
+        <div ref={tokenRef} className="block scroll-mt-28">
           <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
             <span className="text-[11px] uppercase tracking-[0.16em] text-muted">
               encoded token

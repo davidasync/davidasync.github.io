@@ -148,7 +148,11 @@ body::before {
 }
 
 .terminal-window {
-  overflow: hidden;
+  /* clip, not hidden: both round off the corners the same way, but `hidden`
+     makes this a scroll container, and a sticky descendant then sticks to a
+     box that never scrolls — which is to say it does nothing. The dev-tools
+     tab strip depends on this. */
+  overflow: clip;
   border: 1px solid var(--border);
   border-radius: 0.625rem;
   background: color-mix(in srgb, var(--surface) 94%, transparent);
