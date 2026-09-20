@@ -30,6 +30,7 @@ import {
   REMOTE_SHARE_TTL_DAYS,
   uploadSharedDiff,
 } from "@/lib/dev-tools/diff-share";
+import { usePrimaryAction } from "@/lib/dev-tools/use-primary-action";
 import {
   clearToolSpec,
   readDiffSpec,
@@ -185,6 +186,8 @@ export default function DiffChecker() {
     writeDiffSpec({ original, changed });
     setNotice(null);
   };
+
+  usePrimaryAction(compare);
 
   const share = async () => {
     const path = `${window.location.origin}${window.location.pathname}${window.location.search}`;

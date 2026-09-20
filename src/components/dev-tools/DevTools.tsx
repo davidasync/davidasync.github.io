@@ -13,6 +13,10 @@ import {
   type TreeNode,
 } from "@/lib/dev-tools/formatters";
 import {
+  usePrimaryAction,
+  usePrimaryActionLabel,
+} from "@/lib/dev-tools/use-primary-action";
+import {
   clearToolSpec,
   readTextSpec,
   writeTextSpec,
@@ -279,6 +283,7 @@ export default function DevTools() {
   const [fullscreen, setFullscreen] = useState(false);
   const [status, setStatus] = useState("");
   const tool = tools.find(({ id }) => id === activeTool) ?? tools[0];
+  const shortcut = usePrimaryActionLabel();
   const current = toolStates[activeTool];
 
   useEffect(() => {
@@ -414,6 +419,20 @@ export default function DevTools() {
     }
   };
 
+  /**
+   * The accented button for whichever text tool is showing. The panels that
+   * own their own state — diff, jwt, shorten, objects — bind their own.
+   */
+  usePrimaryAction(
+    isTextTool(activeTool)
+      ? () => {
+          if (activeTool === "base64") run("encode");
+          else if (activeTool === "escape") run("escape");
+          else run("format");
+        }
+      : null,
+  );
+
   const selectTool = (id: ToolId) => {
     setFullscreen(false);
     writeToolToUrl(id);
@@ -479,6 +498,11 @@ export default function DevTools() {
           <p className="mt-2 text-xs leading-5 text-muted">
             <span className="mr-2 text-terminal-cyan">&gt;</span>
             {tool.description}
+            {/* Not for the JWT panel: it decodes as you type, so in that mode
+                there is no primary action and the hint would be a lie. */}
+            {activeTool === "jwt" ? null : (
+              <span className="text-muted/70"> {shortcut} runs it.</span>
+            )}
           </p>
         </div>
 

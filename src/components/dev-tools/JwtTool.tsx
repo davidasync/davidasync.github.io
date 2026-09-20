@@ -17,6 +17,7 @@ import {
   type JwtAlgorithm,
   type JwtParseResult,
 } from "@/lib/dev-tools/jwt";
+import { usePrimaryAction } from "@/lib/dev-tools/use-primary-action";
 import {
   clearToolSpec,
   readJwtSpec,
@@ -173,6 +174,10 @@ export default function JwtTool() {
       });
     }
   };
+
+  // Decoding has no button: it happens as you type, so there is nothing left
+  // for the shortcut to trigger.
+  usePrimaryAction(mode === "encode" ? () => void encode() : null);
 
   const loadExample = async () => {
     try {

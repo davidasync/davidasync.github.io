@@ -13,6 +13,7 @@ import {
   validateShortenInput,
   type ShortLink,
 } from "@/lib/dev-tools/shortener";
+import { usePrimaryAction } from "@/lib/dev-tools/use-primary-action";
 import {
   MAX_STORED_LINKS,
   clearToolSpec,
@@ -107,6 +108,8 @@ export default function UrlShortener() {
       setPending(false);
     }
   };
+
+  usePrimaryAction(pending ? null : () => void submit());
 
   const copy = async (value: string) => {
     try {
