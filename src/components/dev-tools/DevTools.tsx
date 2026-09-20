@@ -22,8 +22,9 @@ import DiffChecker from "./DiffChecker";
 import JwtTool from "./JwtTool";
 import TextStats from "./TextStats";
 import TreeView from "./TreeView";
+import UrlShortener from "./UrlShortener";
 
-type ToolId = "base64" | "diff" | "escape" | "jwt" | Formatter;
+type ToolId = "base64" | "diff" | "escape" | "jwt" | "shorten" | Formatter;
 
 const toolIds = [
   "json",
@@ -33,6 +34,7 @@ const toolIds = [
   "base64",
   "escape",
   "jwt",
+  "shorten",
 ] as const satisfies readonly ToolId[];
 
 function isToolId(value: string | null): value is ToolId {
@@ -144,12 +146,21 @@ const tools: Array<{
       "Decode, verify, and sign JSON Web Tokens locally in your browser.",
     inputPlaceholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   },
+  {
+    id: "shorten",
+    label: "Shorten",
+    command: "./shorten.sh --url",
+    description:
+      "Turn a long URL into a short link with an optional custom code and expiry.",
+    inputPlaceholder: "https://example.com/a/very/long/path",
+  },
 ];
 
 const toolGroups: Array<{ label: string; tools: ToolId[] }> = [
   { label: "Format", tools: ["json", "yaml", "xml"] },
   { label: "Compare", tools: ["diff"] },
   { label: "Encode", tools: ["base64", "escape", "jwt"] },
+  { label: "Share", tools: ["shorten"] },
 ];
 
 const emptyState = (): Record<ToolId, ToolState> => ({
@@ -158,6 +169,7 @@ const emptyState = (): Record<ToolId, ToolState> => ({
   escape: { input: "", output: "", error: "", tree: null },
   json: { input: "", output: "", error: "", tree: null },
   jwt: { input: "", output: "", error: "", tree: null },
+  shorten: { input: "", output: "", error: "", tree: null },
   yaml: { input: "", output: "", error: "", tree: null },
   xml: { input: "", output: "", error: "", tree: null },
 });
@@ -456,6 +468,8 @@ export default function DevTools() {
           <DiffChecker />
         ) : activeTool === "jwt" ? (
           <JwtTool />
+        ) : activeTool === "shorten" ? (
+          <UrlShortener />
         ) : (
           <>
         <div className="mb-4 min-h-6 text-xs" aria-live="polite">
