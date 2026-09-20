@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCount } from "@/components/dev-tools/TextStats";
 import {
   DEFAULT_TTL_SECONDS,
@@ -13,7 +13,10 @@ import {
   validateShortenInput,
   type ShortLink,
 } from "@/lib/dev-tools/shortener";
-import { usePrimaryAction } from "@/lib/dev-tools/use-primary-action";
+import {
+  scrollToOutput,
+  usePrimaryAction,
+} from "@/lib/dev-tools/use-primary-action";
 import {
   MAX_STORED_LINKS,
   clearToolSpec,
@@ -35,6 +38,7 @@ const labelClass = "mb-2 block text-[11px] uppercase tracking-[0.16em] text-mute
 const shortHost = SHORTENER_BASE_URL.replace(/^https?:\/\//, "");
 
 export default function UrlShortener() {
+  const latestRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState("");
   const [code, setCode] = useState("");
   const [ttlSeconds, setTtlSeconds] = useState(DEFAULT_TTL_SECONDS);
@@ -98,6 +102,7 @@ export default function UrlShortener() {
         kind: "success",
         message: `Created ${link.shortUrl} — expires ${formatExpiry(link.expireAt)}.`,
       });
+      scrollToOutput(() => latestRef.current);
     } catch (error) {
       setNotice({
         kind: "error",
@@ -265,7 +270,10 @@ export default function UrlShortener() {
       </form>
 
       {latest ? (
-        <div className="mt-6 rounded-sm border border-accent/50 bg-accent-soft/50 p-4">
+        <div
+          ref={latestRef}
+          className="mt-6 scroll-mt-20 rounded-sm border border-accent/50 bg-accent-soft/50 p-4"
+        >
           <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
             newest link
           </p>

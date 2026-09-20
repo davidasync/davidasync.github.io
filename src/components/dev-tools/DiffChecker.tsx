@@ -30,7 +30,10 @@ import {
   REMOTE_SHARE_TTL_DAYS,
   uploadSharedDiff,
 } from "@/lib/dev-tools/diff-share";
-import { usePrimaryAction } from "@/lib/dev-tools/use-primary-action";
+import {
+  scrollToOutput,
+  usePrimaryAction,
+} from "@/lib/dev-tools/use-primary-action";
 import {
   clearToolSpec,
   readDiffSpec,
@@ -185,6 +188,7 @@ export default function DiffChecker() {
     setResult(buildSideBySideDiff(original, changed));
     writeDiffSpec({ original, changed });
     setNotice(null);
+    scrollToOutput(() => outputRef.current);
   };
 
   usePrimaryAction(compare);
@@ -435,7 +439,7 @@ function DiffOutput({
   return (
     <section
       ref={outputRef}
-      className="mt-6"
+      className="mt-6 scroll-mt-20"
       aria-label="Text comparison result"
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">

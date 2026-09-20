@@ -44,6 +44,30 @@ export function usePrimaryAction(run: (() => void) | null) {
 }
 
 /**
+ * Brings a panel's output into view once the primary action has produced it.
+ *
+ * Takes a getter rather than an element because the node usually does not
+ * exist at the moment it is called: the diff output, the newest link and the
+ * newest object are all rendered by the state update that just happened. It is
+ * re-read a frame later, and once more after that, rather than captured now.
+ */
+export function scrollToOutput(getNode: () => HTMLElement | null) {
+  let attempts = 2;
+
+  const tick = () => {
+    const node = getNode();
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    attempts -= 1;
+    if (attempts > 0) window.requestAnimationFrame(tick);
+  };
+
+  window.requestAnimationFrame(tick);
+}
+
+/**
  * How to spell the shortcut for whoever is reading. Resolved after mount
  * because the static export has no platform to render against, and guessing
  * wrong during hydration would swap the label out from under them anyway.

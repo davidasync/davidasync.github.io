@@ -13,6 +13,7 @@ import {
   type TreeNode,
 } from "@/lib/dev-tools/formatters";
 import {
+  scrollToOutput,
   usePrimaryAction,
   usePrimaryActionLabel,
 } from "@/lib/dev-tools/use-primary-action";
@@ -386,12 +387,7 @@ export default function DevTools() {
       if (action === "minify") {
         setStatus("Minified to one line.");
       }
-      window.requestAnimationFrame(() => {
-        stdoutRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      });
+      scrollToOutput(() => stdoutRef.current);
     } catch (error) {
       updateCurrent({
         error: error instanceof Error ? error.message : "Unable to process input.",

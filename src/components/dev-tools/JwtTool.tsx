@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   EXAMPLE_JWT_HEADER,
   EXAMPLE_JWT_PAYLOAD,
@@ -17,7 +17,10 @@ import {
   type JwtAlgorithm,
   type JwtParseResult,
 } from "@/lib/dev-tools/jwt";
-import { usePrimaryAction } from "@/lib/dev-tools/use-primary-action";
+import {
+  scrollToOutput,
+  usePrimaryAction,
+} from "@/lib/dev-tools/use-primary-action";
 import {
   clearToolSpec,
   readJwtSpec,
@@ -41,6 +44,7 @@ const defaultHeader = JSON.stringify(EXAMPLE_JWT_HEADER, null, 2);
 const defaultPayload = JSON.stringify(EXAMPLE_JWT_PAYLOAD, null, 2);
 
 export default function JwtTool() {
+  const tokenRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>("decode");
   const [token, setToken] = useState("");
   const [headerText, setHeaderText] = useState(defaultHeader);
@@ -166,6 +170,9 @@ export default function JwtTool() {
         kind: "success",
         message: `Token signed with ${algorithm}.`,
       });
+      // The token sits above the fields that produced it, so this scrolls back
+      // up to the result rather than down to it.
+      scrollToOutput(() => tokenRef.current);
     } catch (error) {
       setNotice({
         kind: "error",
@@ -280,7 +287,7 @@ export default function JwtTool() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="block">
+        <div ref={tokenRef} className="block scroll-mt-20">
           <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
             <span className="text-[11px] uppercase tracking-[0.16em] text-muted">
               encoded token
