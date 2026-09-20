@@ -127,6 +127,38 @@ export default function DiffChecker() {
     return () => window.clearTimeout(timer);
   }, [shareRef]);
 
+  /**
+   * Switching tools unmounts this panel, so anything typed here only survives
+   * the trip if it has been written down. It used to be written only by
+   * compare(), which meant a draft you had not compared yet was gone by the
+   * time you came back.
+   *
+   * A ref, so the unmount flush below can see the latest values without
+   * re-subscribing on every keystroke.
+   */
+  const draftRef = useRef({ original, changed });
+
+  const persistDraft = () => {
+    const draft = draftRef.current;
+    // An empty pair means the draft was cleared, and clearToolSpec has already
+    // removed the entry — writing it back would resurrect it as "".
+    if (draft.original === "" && draft.changed === "") return;
+    writeDiffSpec(draft);
+  };
+
+  // Debounced, so a large paste is not re-serialised on every keystroke.
+  useEffect(() => {
+    draftRef.current = { original, changed };
+
+    const timer = window.setTimeout(persistDraft, 300);
+    return () => window.clearTimeout(timer);
+  }, [original, changed]);
+
+  // Again on the way out, because the debounce above is cancelled by its own
+  // cleanup — switching tools within 300ms of a keystroke would otherwise lose
+  // exactly the last thing you typed.
+  useEffect(() => persistDraft, []);
+
   const clearSharedHash = () => {
     if (isSharedDiffHash(window.location.hash)) {
       window.history.replaceState(
