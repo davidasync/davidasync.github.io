@@ -69,6 +69,9 @@ export default function DiffChecker() {
     return null;
   });
   const [sharing, setSharing] = useState(false);
+  /** The last link built here, kept on screen so it survives a denied
+   * clipboard and can be read back before it is sent to anyone. */
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
 
   // Inlining the web fonts is the slowest part of a capture and never
@@ -142,6 +145,7 @@ export default function DiffChecker() {
     setter(value);
     setResult(null);
     setNotice(null);
+    setShareUrl(null);
   };
 
   const compare = () => {
@@ -156,6 +160,7 @@ export default function DiffChecker() {
     const inlineUrl = `${path}#diff=${inlineEncoded}`;
 
     setSharing(true);
+    setShareUrl(null);
     setNotice({ kind: "success", message: "Creating share link..." });
 
     try {
@@ -169,6 +174,7 @@ export default function DiffChecker() {
 
       const url = `${path}#diff=${encoded}`;
       window.history.replaceState(null, "", `#diff=${encoded}`);
+      setShareUrl(url);
 
       try {
         await navigator.clipboard.writeText(url);
@@ -182,8 +188,8 @@ export default function DiffChecker() {
         setNotice({
           kind: "error",
           message: remote
-            ? `Share link created (expires in ${REMOTE_SHARE_TTL_DAYS} days), but clipboard access was denied.`
-            : "Share link created, but clipboard access was denied.",
+            ? `Share link created (expires in ${REMOTE_SHARE_TTL_DAYS} days), but clipboard access was denied — copy it below.`
+            : "Share link created, but clipboard access was denied — copy it below.",
         });
       }
     } catch (error) {
@@ -196,6 +202,17 @@ export default function DiffChecker() {
       });
     } finally {
       setSharing(false);
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setNotice({ kind: "success", message: "Share link copied to clipboard." });
+    } catch {
+      setNotice({ kind: "error", message: "Clipboard access was denied." });
     }
   };
 
@@ -305,6 +322,7 @@ export default function DiffChecker() {
             setChanged("");
             setResult(null);
             setNotice(null);
+            setShareUrl(null);
           }}
           disabled={!original && !changed}
           className={`${buttonClass} border-transparent text-muted hover:border-border hover:text-foreground`}
@@ -334,6 +352,35 @@ export default function DiffChecker() {
           </p>
         )}
       </div>
+
+      {shareUrl ? (
+        <div className="mt-3 rounded-sm border border-accent/50 bg-accent-soft/50 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
+              share link
+            </span>
+            <button
+              type="button"
+              onClick={() => void copyShareUrl()}
+              className="inline-flex items-center justify-center rounded-sm border border-accent/60 bg-accent-soft px-2 py-1 text-[10px] uppercase tracking-wide text-accent transition hover:border-accent"
+            >
+              copy
+            </button>
+          </div>
+          {/* An input rather than wrapped text: an inline link runs to the
+              2,000 characters of MAX_SHARE_URL_LENGTH, which would push the
+              comparison itself off the screen. This scrolls and stays one
+              line, and a click still selects the whole thing. */}
+          <input
+            value={shareUrl}
+            readOnly
+            aria-label="Share link"
+            spellCheck={false}
+            onFocus={(event) => event.currentTarget.select()}
+            className="w-full rounded-sm border border-border bg-background/70 p-2 text-[11px] leading-5 text-foreground focus:border-accent focus:outline-none"
+          />
+        </div>
+      ) : null}
 
       {result ? <DiffOutput result={result} outputRef={outputRef} /> : null}
     </div>
