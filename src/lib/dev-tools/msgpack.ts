@@ -93,7 +93,8 @@ type Wire = {
 export type MsgpackShape = Map<string, Wire>;
 
 export type UnpackedMsgpack = {
-  json: string;
+  /** JSON, or the bare text when the whole value is a string. */
+  text: string;
   shape: MsgpackShape;
   size: number;
 };
@@ -101,6 +102,8 @@ export type UnpackedMsgpack = {
 export type PackedMsgpack = {
   base64: string;
   size: number;
+  /** The input was not JSON, so it was packed as one MessagePack string. */
+  asText: boolean;
 };
 
 export function unpackMsgpack(input: string): UnpackedMsgpack {
@@ -115,21 +118,33 @@ export function unpackMsgpack(input: string): UnpackedMsgpack {
     );
   }
 
-  return { json: JSON.stringify(value, null, 2), shape, size: bytes.length };
+  // A lone string reads as itself, without the quotes and escapes of JSON —
+  // the same text that encoding it packs back into a string.
+  const text =
+    typeof value === "string" ? value : JSON.stringify(value, null, 2);
+
+  return { text, shape, size: bytes.length };
 }
 
 /**
- * Packs JSON as MessagePack. With `template` — the Base64 token the JSON was
- * unpacked from — values keep the encodings they had in it.
+ * Packs input as MessagePack. JSON packs as the value it describes; anything
+ * else is still a value MessagePack can hold — a string — and packs as one.
+ * With `template` — the Base64 token the JSON was unpacked from — values keep
+ * the encodings they had in it.
  */
-export function packMsgpack(jsonText: string, template = ""): PackedMsgpack {
-  let value: Json;
+export function packMsgpack(input: string, template = ""): PackedMsgpack {
+  if (input.trim() === "") {
+    throw new Error("Enter JSON or text to encode.");
+  }
+
+  let value: Json = input;
+  let asText = true;
 
   try {
-    value = JSON.parse(jsonText) as Json;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid JSON.";
-    throw new Error(`Invalid JSON: ${message}`);
+    value = JSON.parse(input) as Json;
+    asText = false;
+  } catch {
+    // Not JSON: packed as the string it is.
   }
 
   const shape: MsgpackShape =
@@ -138,7 +153,7 @@ export function packMsgpack(jsonText: string, template = ""): PackedMsgpack {
   new MsgpackPacker(out, shape).pack(value, []);
   const bytes = out.result();
 
-  return { base64: encodeBase64(bytes), size: bytes.length };
+  return { base64: encodeBase64(bytes), size: bytes.length, asText };
 }
 
 /**

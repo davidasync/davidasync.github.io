@@ -175,8 +175,8 @@ const tools: Array<{
     label: "MsgPack",
     command: "./msgpack.sh",
     description:
-      "Decode Base64 MessagePack to JSON, or encode JSON back. Encoding keeps the Go encodings of the last token decoded.",
-    inputPlaceholder: "Enter JSON or Base64 MessagePack...",
+      "Decode Base64 MessagePack to JSON, or encode JSON or plain text back. Encoding keeps the Go encodings of the last token decoded.",
+    inputPlaceholder: "Enter JSON, text, or Base64 MessagePack...",
   },
   {
     id: "shorten",
@@ -422,12 +422,15 @@ export default function DevTools() {
       let output: string;
       let tree: TreeNode | null = null;
       let template = msgpackTemplate;
+      let packedText = false;
 
       if (activeTool === "msgpack" && action === "decode") {
-        output = unpackMsgpack(current.input).json;
+        output = unpackMsgpack(current.input).text;
         template = current.input;
       } else if (activeTool === "msgpack" && action === "encode") {
-        output = packMsgpack(current.input, template).base64;
+        const packed = packMsgpack(current.input, template);
+        output = packed.base64;
+        packedText = packed.asText;
       } else if (action === "encode" || action === "decode") {
         output =
           action === "encode"
@@ -458,9 +461,11 @@ export default function DevTools() {
       }
       if (activeTool === "msgpack" && action === "encode") {
         setStatus(
-          template
-            ? "Encoded in the encodings of the last token decoded."
-            : "Encoded as plain MessagePack. Decode a Go token first to keep its encodings.",
+          packedText
+            ? "Not JSON, so encoded as a MessagePack string."
+            : template
+              ? "Encoded in the encodings of the last token decoded."
+              : "Encoded as plain MessagePack. Decode a Go token first to keep its encodings.",
         );
       }
       scrollToOutput(() => stdoutRef.current);
