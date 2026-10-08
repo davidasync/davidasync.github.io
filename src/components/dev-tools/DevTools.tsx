@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import TerminalWindow from "@/components/TerminalWindow";
 import { decodeBase64, encodeBase64 } from "@/lib/dev-tools/base64";
 import { escapeText, unescapeText } from "@/lib/dev-tools/escape";
+import { packMsgpack, unpackMsgpack } from "@/lib/dev-tools/msgpack";
 import {
   buildFormatterTree,
   formatJsonWithExpandedStrings,
@@ -35,6 +36,7 @@ type ToolId =
   | "diff"
   | "escape"
   | "jwt"
+  | "msgpack"
   | "objects"
   | "shorten"
   | Formatter;
@@ -47,6 +49,7 @@ const toolIds = [
   "base64",
   "escape",
   "jwt",
+  "msgpack",
   "shorten",
   "objects",
 ] as const satisfies readonly ToolId[];
@@ -86,7 +89,14 @@ function isFormatter(id: ToolId): id is Formatter {
 }
 
 function isTextTool(id: ToolId): id is TextToolId {
-  return id === "base64" || id === "escape" || isFormatter(id);
+  return (
+    id === "base64" || id === "escape" || id === "msgpack" || isFormatter(id)
+  );
+}
+
+/** The tools whose stdin has an encode and a decode button. */
+function isCodec(id: ToolId) {
+  return id === "base64" || id === "msgpack";
 }
 
 function hasTreeOutput(id: ToolId) {
@@ -161,6 +171,14 @@ const tools: Array<{
     inputPlaceholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   },
   {
+    id: "msgpack",
+    label: "MsgPack",
+    command: "./msgpack.sh",
+    description:
+      "Decode Base64 MessagePack to JSON, or encode JSON back. Encoding keeps the Go encodings of the last token decoded.",
+    inputPlaceholder: "Enter JSON or Base64 MessagePack...",
+  },
+  {
     id: "shorten",
     label: "Shorten",
     command: "./shorten.sh --url",
@@ -181,7 +199,7 @@ const tools: Array<{
 const toolGroups: Array<{ label: string; tools: ToolId[] }> = [
   { label: "Format", tools: ["json", "yaml", "xml"] },
   { label: "Compare", tools: ["diff"] },
-  { label: "Encode", tools: ["base64", "escape", "jwt"] },
+  { label: "Encode", tools: ["base64", "escape", "jwt", "msgpack"] },
   { label: "Share", tools: ["shorten", "objects"] },
 ];
 
@@ -191,6 +209,7 @@ const emptyState = (): Record<ToolId, ToolState> => ({
   escape: { input: "", output: "", error: "", tree: null },
   json: { input: "", output: "", error: "", tree: null },
   jwt: { input: "", output: "", error: "", tree: null },
+  msgpack: { input: "", output: "", error: "", tree: null },
   objects: { input: "", output: "", error: "", tree: null },
   shorten: { input: "", output: "", error: "", tree: null },
   yaml: { input: "", output: "", error: "", tree: null },
@@ -288,6 +307,12 @@ export default function DevTools() {
   const [outputView, setOutputView] = useState<OutputMode>("tree");
   const [fullscreen, setFullscreen] = useState(false);
   const [status, setStatus] = useState("");
+  /**
+   * The last MessagePack token decoded. JSON has no room for what a Go token
+   * carries — timestamps, gob-encoded options — so encode follows this token's
+   * encodings, which is what lets the service that minted it read the result.
+   */
+  const [msgpackTemplate, setMsgpackTemplate] = useState("");
   const tool = tools.find(({ id }) => id === activeTool) ?? tools[0];
   const shortcut = usePrimaryActionLabel();
   const current = toolStates[activeTool];
@@ -297,7 +322,14 @@ export default function DevTools() {
       setToolStates((states) => {
         const next = { ...states };
 
-        for (const id of ["json", "yaml", "xml", "base64", "escape"] as const) {
+        for (const id of [
+          "json",
+          "yaml",
+          "xml",
+          "base64",
+          "escape",
+          "msgpack",
+        ] as const) {
           const stored = readTextSpec(id);
           if (!stored) continue;
 
@@ -320,6 +352,7 @@ export default function DevTools() {
 
         return next;
       });
+      setMsgpackTemplate(readTextSpec("msgpack")?.template ?? "");
     };
 
     const syncFromUrl = () => {
@@ -388,8 +421,14 @@ export default function DevTools() {
     try {
       let output: string;
       let tree: TreeNode | null = null;
+      let template = msgpackTemplate;
 
-      if (action === "encode" || action === "decode") {
+      if (activeTool === "msgpack" && action === "decode") {
+        output = unpackMsgpack(current.input).json;
+        template = current.input;
+      } else if (activeTool === "msgpack" && action === "encode") {
+        output = packMsgpack(current.input, template).base64;
+      } else if (action === "encode" || action === "decode") {
         output =
           action === "encode"
             ? encodeBase64(current.input)
@@ -408,11 +447,21 @@ export default function DevTools() {
       }
 
       updateCurrent({ output, tree, error: "" });
-      if (isTextTool(activeTool)) {
+      if (activeTool === "msgpack") {
+        setMsgpackTemplate(template);
+        writeTextSpec(activeTool, { input: current.input, output, template });
+      } else if (isTextTool(activeTool)) {
         writeTextSpec(activeTool, { input: current.input, output });
       }
       if (action === "minify") {
         setStatus("Minified to one line.");
+      }
+      if (activeTool === "msgpack" && action === "encode") {
+        setStatus(
+          template
+            ? "Encoded in the encodings of the last token decoded."
+            : "Encoded as plain MessagePack. Decode a Go token first to keep its encodings.",
+        );
       }
       scrollToOutput(() => stdoutRef.current);
     } catch (error) {
@@ -449,7 +498,7 @@ export default function DevTools() {
   usePrimaryAction(
     isTextTool(activeTool)
       ? () => {
-          if (activeTool === "base64") run("encode");
+          if (isCodec(activeTool)) run("encode");
           else if (activeTool === "escape") run("escape");
           else run("format");
         }
@@ -581,7 +630,7 @@ export default function DevTools() {
                 stdin
               </span>
               <div className="flex flex-wrap items-center justify-end gap-1.5">
-                {activeTool === "base64" ? (
+                {isCodec(activeTool) ? (
                   <>
                     <button
                       type="button"
@@ -636,6 +685,9 @@ export default function DevTools() {
                   onClick={() => {
                     if (isTextTool(activeTool)) {
                       clearToolSpec(activeTool);
+                    }
+                    if (activeTool === "msgpack") {
+                      setMsgpackTemplate("");
                     }
                     updateCurrent({
                       input: "",

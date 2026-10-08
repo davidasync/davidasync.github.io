@@ -1,12 +1,20 @@
 export const DEV_TOOLS_STORAGE_VERSION = 1;
 
-export type TextToolId = "base64" | "escape" | "json" | "xml" | "yaml";
+export type TextToolId =
+  | "base64"
+  | "escape"
+  | "json"
+  | "msgpack"
+  | "xml"
+  | "yaml";
 export type StoredToolId = TextToolId | "diff" | "jwt" | "objects" | "shorten";
 
 export type StoredTextSpec = {
   v: typeof DEV_TOOLS_STORAGE_VERSION;
   input: string;
   output: string;
+  /** MessagePack only: the last token decoded, whose encodings encode keeps. */
+  template?: string;
 };
 
 export type StoredDiffSpec = {
@@ -155,7 +163,8 @@ function isTextSpec(value: unknown): value is StoredTextSpec {
   return (
     isVersioned(value) &&
     typeof value.input === "string" &&
-    typeof value.output === "string"
+    typeof value.output === "string" &&
+    (value.template === undefined || typeof value.template === "string")
   );
 }
 
